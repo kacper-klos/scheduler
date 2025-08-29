@@ -27,9 +27,10 @@ repos:
     rev: v1.3.5
     hooks:
       - id: clang-tidy
-        args: [--warnings-as-errors=*]
+        args: [-p=build, --warnings-as-errors=*]
       - id: cppcheck
       - id: cpplint
+        args: [--filter=-legal/copyright]
 
   # Typos
   - repo: https://github.com/codespell-project/codespell
