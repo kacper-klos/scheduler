@@ -22,15 +22,14 @@ repos:
       - id: clang-format
         types_or: [c, c++]
 
-  # C/C++ linters/analyzers
+  # C/C++ analyzers
   - repo: https://github.com/pocc/pre-commit-hooks
     rev: v1.3.5
     hooks:
       - id: clang-tidy
         args: [-p=build, --warnings-as-errors=*]
       - id: cppcheck
-      - id: cpplint
-        args: [--filter=-legal/copyright]
+        args: [--std=c++20, --enable=warning,performance,portability]
 
   # Typos
   - repo: https://github.com/codespell-project/codespell
