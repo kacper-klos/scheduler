@@ -1,12 +1,16 @@
+#include "calendar.hpp"
 #include <QApplication>
-#include <QPushButton>
+#include <QTableView>
 
 int main(int argc, char *argv[]) {
-  QApplication app(argc, argv);
+    QApplication app(argc, argv);
 
-  QPushButton button("Test");
-  button.resize(200, 100);
-  button.show();
+    Calendar calendar(6, 18);
+    QTableView calendar_view;
 
-  return app.exec();
+    calendar_view.setModel(&calendar);
+    calendar_view.resize(600, 400);
+    calendar_view.show();
+
+    return app.exec();
 }
