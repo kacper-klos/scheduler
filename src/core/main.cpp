@@ -1,19 +1,8 @@
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <bitset>
+#include <bits/stdc++.h>
 using namespace std;
 
-const int MAXN = 64;
-
-struct Slot {
-    int id, day, period;
-};
-
-struct Room {
-    int roomId, capacity;
-    string roomName;
-};
+struct Slot { int id, day, period; };
+struct Room { int roomId, capacity; string roomName; };
 
 struct Lesson {
     int id;
@@ -26,350 +15,485 @@ struct Lesson {
     vector<int> possibleRooms;
 };
 
-struct Variable {
-    int id, lessonIdx, idx;
-};
+struct Variable { int id, lessonIdx, idx; };
 
 struct Solver {
     vector<Slot>& allSlots;
     vector<Lesson>& lessons;
-    vector<Variable> vars;
-    vector<bitset<MAXN>> groupBusy;
-    vector<bitset<MAXN>> teacherBusy;
-    vector<bitset<MAXN>> roomBusy;
-    vector<vector<int>> domain;
-    vector<vector<int>> roomDomain;
     vector<Room> rooms;
-    vector<int> bestAssign;
-    vector<int> bestAssignRooms;
-    vector<int> degree;
-    vector<vector<int>> graph;
 
-    Solver(vector<Slot>& slots, vector<Lesson>& lessons, vector<Room>& rms, int numGroups, int numTeachers)
-        : allSlots(slots), lessons(lessons), rooms(rms) {
-        int curid = 1;
-        for (int l = 0; l < lessons.size(); l++) {
-            for (int i = 0; i < lessons[l].hours; i++) {
-                vars.push_back({curid++, l, i});
-            }
-        }
-        int S = slots.size();
-        groupBusy.assign(S, bitset<MAXN>());
-        teacherBusy.assign(S, bitset<MAXN>());
-        roomBusy.assign(S, bitset<MAXN>());
-        domain.resize(vars.size());
-        roomDomain.resize(vars.size());
-        for (int i = 0; i < vars.size(); i++) {
-            domain[i] = lessons[vars[i].lessonIdx].possibleSlots;
-            roomDomain[i] = lessons[vars[i].lessonIdx].possibleRooms;
-            sort(roomDomain[i].begin(), roomDomain[i].end());
-            sort(domain[i].begin(), domain[i].end());
-        }
-        degree.assign(vars.size(), 0);
-        graph.resize(vars.size());
-        for (int i = 0; i < vars.size(); i++) {
-            Lesson& L1 = lessons[vars[i].lessonIdx];
-            for (int j = i + 1; j < vars.size(); j++) {
-                Lesson& L2 = lessons[vars[j].lessonIdx];
-                if (L1.teacher == L2.teacher or L1.group == L2.group or find(L1.colidingGroups.begin(), L1.colidingGroups.end(), L2.group) != L1.colidingGroups.end()) {
-                    degree[i]++;
-                    degree[j]++;
-                    graph[i].push_back(j);
-                    graph[j].push_back(i);
-                }
-            }
-        }
-    }
+    vector<Variable> vars;
 
-    vector<int> orderValues(int vid, const vector<int>& asg) {
-        vector<pair<int, int>> vals;
-        const Lesson& L = lessons[vars[vid].lessonIdx];
-        for (int s : domain[vid]) {
-            if (teacherBusy[s][L.teacher] || groupBusy[s][L.group]) {
-                continue;
-            }
-            bool colide = false;
-            for (int g : L.colidingGroups) {
-                if (groupBusy[s][g]) {
-                    colide = true;
-                    break;
-                }
-            }
-            if (colide) continue;
-            int score = 0;
-            for (int nb : graph[vid]) {
-                if (asg[nb] != -1) continue;
-                if (binary_search(domain[nb].begin(), domain[nb].end(), s)) {
-                    score++;
-                }
-            }
-            int freeRooms = 0;
-            for (int r : roomDomain[vid]) {
-                if (!roomBusy[s][r]) {
-                    freeRooms++;
-                    if (freeRooms > 1) break;
-                }
-            }
-            if (freeRooms <= 1) score += 1;
-            vals.push_back({score, s});
-        }
-        sort(vals.begin(), vals.end());
-        vector<int> out;
-        out.reserve(vals.size());
-        for (auto& p : vals) out.push_back(p.second);
-        return out;
-    }
+    vector<vector<char>> allowedSlot;
+    vector<vector<char>> allowedRoom;
+    vector<int> slotOf;
+    vector<int> roomOf;
 
-    vector<int> orderRooms(int vid, int s, const vector<int>& asg) {
-        vector<pair<int, int>> vals;
-        for (int r : roomDomain[vid]) {
-            if (roomBusy[s][r]) continue;
-            int score = 0;
-            for (int nb : graph[vid]) {
-                if (asg[nb] != -1) continue;
-                if (!binary_search(domain[nb].begin(), domain[nb].end(), s)) continue;
-                if (binary_search(roomDomain[nb].begin(), roomDomain[nb].end(), r)) {
-                    score++;
-                }
-            }
-            vals.push_back({score, r});
-        }
-        sort(vals.begin(), vals.end());
-        vector<int> out;
-        out.reserve(vals.size());
-        for (auto& p : vals) out.push_back(p.second);
-        return out;
-    }
+    vector<vector<int>> teacherBusy;
+    vector<vector<int>> groupBusy;
+    vector<vector<int>> roomBusy;
 
-    bool canAssign(int vidx, int s, const vector<int>& asg) {
-        const Lesson& L = lessons[vars[vidx].lessonIdx];
-        if (!binary_search(domain[vidx].begin(), domain[vidx].end(), s) or teacherBusy[s][L.teacher] or groupBusy[s][L.group]) {
-            return false;
-        }
-        for (int x : L.colidingGroups) {
-            if (groupBusy[s][x]) {
+    int numSlots, numTeachers, numGroups, numRooms;
+
+    vector<int> bestAssign, bestAssignRooms;
+    int bestCost = INT_MAX;
+    const int W_TEACH = 1;
+    const int W_GROUP = 1;
+    const int W_COLL  = 1;
+    const int W_ROOM  = 1;
+    const int W_DISALLOWED = 1000;
+
+
+    mt19937 rng{random_device{}()};
+    bool verify_and_report(ostream& os = cerr) const {
+
+        for (int v = 0; v < (int)vars.size(); ++v) {
+            if (slotOf[v] < 0 || roomOf[v] < 0) {
+                os << "[ERR] v=" << v << " nieprzypisany\n";
                 return false;
             }
         }
+        vector<vector<int>> tBusy(numSlots, vector<int>(numTeachers, 0));
+        vector<vector<int>> gBusy(numSlots, vector<int>(numGroups, 0));
+        vector<vector<int>> rBusy(numSlots, vector<int>(numRooms, 0));
+
+        for (int v = 0; v < (int)vars.size(); ++v) {
+            int s = slotOf[v], r = roomOf[v];
+            const Lesson& L = lessons[vars[v].lessonIdx];
+
+            if (!allowedSlot[v][s]) { os << "[ERR] v="<<v<<" w niedozwolonym slocie "<<s<<"\n"; return false; }
+            if (!allowedRoom[v][r]) { os << "[ERR] v="<<v<<" w niedozwolonej sali "<<r<<"\n"; return false; }
+
+            if (++tBusy[s][L.teacher] > 1) { os << "[ERR] konflikt nauczyciela T"<<L.teacher<<" w slocie "<<s<<"\n"; return false; }
+            if (++gBusy[s][L.group]   > 1) { os << "[ERR] konflikt grupy G"<<L.group<<" w slocie "<<s<<"\n"; return false; }
+            if (++rBusy[s][r]         > 1) { os << "[ERR] konflikt sali R"<<r<<" w slocie "<<s<<"\n"; return false; }
+        }
+        for (int v = 0; v < (int)vars.size(); ++v) {
+            int s = slotOf[v];
+            const Lesson& L = lessons[vars[v].lessonIdx];
+            for (int g : L.colidingGroups) {
+                if (gBusy[s][g] > 0) {
+                    os << "[ERR] kolizja kolidujących grup: G"<<L.group<<" vs G"<<g<<" w slocie "<<s<<"\n";
+                    return false;
+                }
+            }
+        }
+
+        os << "[OK] Plan spełnia wszystkie twarde ograniczenia.\n";
         return true;
     }
 
-    int countSlots(int v) {
+    Solver(vector<Slot>& slots, vector<Lesson>& les, vector<Room> rms,
+           int numGroups_, int numTeachers_)
+      : allSlots(slots), lessons(les), rooms(move(rms)), numSlots(allSlots.size()), numGroups(numGroups_), numTeachers(numTeachers_) {
+
+        numSlots = allSlots.size();
+        numRooms = rooms.size();
+        int cur = 0;
+        for (int l = 0; l < lessons.size(); ++l) {
+            for (int i = 0; i < lessons[l].hours; ++i) {
+                vars.push_back({cur++, l, i});
+            }
+        }
+
+        allowedSlot.assign(vars.size(), vector<char>(numSlots, 0));
+        allowedRoom.assign(vars.size(), vector<char>(numRooms, 0));
+        for (int v = 0; v < vars.size(); ++v) {
+            const Lesson& L = lessons[vars[v].lessonIdx];
+            for (int s : L.possibleSlots) {
+                allowedSlot[v][s] = 1;
+            }
+            for (int r : L.possibleRooms) {
+                allowedRoom[v][r] = 1;
+            }
+        }
+
+        teacherBusy.assign(numSlots, vector<int>(numTeachers, 0));
+        groupBusy.assign(numSlots, vector<int>(numGroups , 0));
+        roomBusy.assign(numSlots, vector<int>(numRooms  , 0));
+
+        slotOf.assign(vars.size(), -1);
+        roomOf.assign(vars.size(), -1);
+        bestAssign = slotOf;
+        bestAssignRooms = roomOf;
+    }
+
+    int varCostNoSelf(int v, int s, int r) {
         const Lesson& L = lessons[vars[v].lessonIdx];
-        int cnt = 0;
-        for (int s : domain[v]) {
-            if (teacherBusy[s][L.teacher] or groupBusy[s][L.group]) {
-                continue;
+
+        int cost = 0;
+        cost+=!allowedSlot[v][s] ? W_DISALLOWED : 0;
+        cost+=!allowedRoom[v][r] ? W_DISALLOWED : 0;
+        cost+=teacherBusy[s][L.teacher] > 0 ? W_TEACH : 0;
+        cost+=groupBusy[s][L.group] > 0 ? W_GROUP : 0;
+        cost+=roomBusy[s][r] > 0 ? W_ROOM : 0;
+        for (int g : L.colidingGroups) {
+            if (groupBusy[s][g] > 0) {
+                cost += W_COLL;
+                break;
             }
-            bool colide = false;
+        }
+
+        return cost;
+    }
+
+    int varCostRemovedSelf(int v, int s, int r) const {
+        const Lesson& L = lessons[vars[v].lessonIdx];
+        int cost=0;
+
+        int curTeacherBusy=teacherBusy[s][L.teacher] - (slotOf[v]==s);
+        int curGroupBusy=groupBusy[s][L.group] - (slotOf[v]==s);
+        int curRoomBusy=roomBusy[s][r] - (slotOf[v]==s and roomOf[v]==r);
+
+        cost+=!allowedSlot[v][s] ? W_DISALLOWED : 0;
+        cost+=!allowedRoom[v][r] ? W_DISALLOWED : 0;
+        cost+=curGroupBusy>0 ? W_GROUP : 0;
+        cost+=curTeacherBusy>0 ? W_TEACH : 0;
+        cost+=curRoomBusy>0 ? W_ROOM : 0;
+
+        for (int g : L.colidingGroups) {
+            if (groupBusy[s][g] > 0) {
+                cost += W_COLL;
+                break;
+            }
+        }
+        return cost;
+
+    }
+
+
+    void buildInitial() {
+        for (int s = 0; s < numSlots; s++) {
+            fill(teacherBusy[s].begin(), teacherBusy[s].end(), 0);
+            fill(groupBusy[s].begin(),   groupBusy[s].end(),   0);
+            fill(roomBusy[s].begin(),    roomBusy[s].end(),    0);
+        }
+        fill(slotOf.begin(), slotOf.end(), -1);
+        fill(roomOf.begin(), roomOf.end(), -1);
+        vector<int> order(vars.size());
+        iota(order.begin(), order.end(), 0);
+        shuffle(order.begin(), order.end(), rng);
+
+
+        for (int v : order) {
+            const Lesson& L = lessons[vars[v].lessonIdx];
+            int bestC=INT_MAX;
+            int bestS = uniform_int_distribution<int>(0, numSlots-1)(rng);
+            int bestR = uniform_int_distribution<int>(0, numRooms-1)(rng);
+
+            vector<int> candS = L.possibleSlots;
+            vector<int> candR = L.possibleRooms;
+            shuffle(candS.begin(), candS.end(), rng);
+            shuffle(candR.begin(), candR.end(), rng);
+            for (int s : candS) {
+                for (int r : candR) {
+                    int cur=varCostNoSelf(v,s,r);
+                    if (cur<bestC) {
+                        bestC = cur;
+                        bestR = r;
+                        bestS = s;
+                        if (bestC==0) {
+                            break;
+                        }
+                    }
+                }
+                if (bestC==0) {
+                    break;
+                }
+            }
+            slotOf[v]=bestS;
+            roomOf[v]=bestR;
+            teacherBusy[bestS][L.teacher]++;
+            groupBusy[bestS][L.group]++;
+            roomBusy[bestS][bestR]++;
+
+        }
+        bestAssign = slotOf;
+        bestAssignRooms = roomOf;
+        bestCost = totalCost();
+    }
+
+    int totalCost() {
+        int sum = 0;
+        for (int v = 0; v <vars.size(); ++v) {
+            sum += varCostRemovedSelf(v, slotOf[v], roomOf[v]);
+        }
+        return sum;
+    }
+
+    int deltaMove(int v, int ns, int nr)  {
+        int s0 = slotOf[v], r0 = roomOf[v];
+
+        int before = varCostRemovedSelf(v, s0, r0);
+        int after  = varCostRemovedSelf(v, ns, nr);
+        return after - before;
+    }
+
+    inline void applyMove(int v, int ns, int nr) {
+        int s0 = slotOf[v], r0 = roomOf[v];
+        const Lesson& L = lessons[vars[v].lessonIdx];
+        teacherBusy[s0][L.teacher]--; groupBusy[s0][L.group]--; roomBusy[s0][r0]--;
+        teacherBusy[ns][L.teacher]++; groupBusy[ns][L.group]++; roomBusy[ns][nr]++;
+        slotOf[v] = ns; roomOf[v] = nr;
+    }
+
+    vector<int> orderRooms(int vid, int s) {
+        vector<pair<int,int>> vals;
+        for (int r = 0; r < numRooms; ++r) {
+            if (!allowedRoom[vid][r]) continue;
+            int sc = roomBusy[s][r];
+            vals.push_back({sc, r});
+        }
+        sort(vals.begin(), vals.end());
+        vector<int> out;
+        out.reserve(vals.size());
+        for (auto &p : vals) out.push_back(p.second);
+        return out;
+    }
+
+    vector<int> orderValues(int vid) {
+        vector<pair<int,int>> vals;
+        const Lesson& L = lessons[vars[vid].lessonIdx];
+
+        for (int s : L.possibleSlots) {
+            int val=0;
+            if (teacherBusy[s][L.teacher] > 0) val += 3;
+            if (groupBusy[s][L.group] > 0) val += 3;
             for (int g : L.colidingGroups) {
-                if (groupBusy[s][g]) {
-                    colide = true;
+                if (groupBusy[s][g] > 0) {
+                    val += 3;
                     break;
                 }
             }
-            if (colide) {
-                continue;
+
+            bool anyFree = 0;
+            for (int r : L.possibleRooms) if (roomBusy[s][r]==0) {
+                anyFree=1;
+                break;
             }
-            for (int r : roomDomain[v]) {
-                if (!roomBusy[s][r]) {
-                    cnt++;
-                    break;
-                }
-            }
+            if (!anyFree) val += 1;
+            vals.push_back({val, s});
+
         }
-        return cnt;
+        sort(vals.begin(), vals.end());
+        vector<int> out; out.reserve(vals.size());
+        for (auto &p : vals) out.push_back(p.second);
+        return out;
     }
 
-    int getVariable(const vector<int>& asg) {
-        int best = -1;
-        int bestCnt = 1e9;
-        int bestDegree = -1;
-        for (int i = 0; i < vars.size(); i++) {
-            if (asg[i] != -1) {
-                continue;
-            }
-            int cnt = countSlots(i);
-            if (cnt == 0) {
-                return i;
-            }
-            if (cnt < bestCnt or (cnt == bestCnt and degree[i] > bestDegree)) {
-                best = i;
-                bestCnt = cnt;
-                bestDegree = degree[i];
+    int pickVarBiased() {
+        int pick = uniform_int_distribution<int>(0, vars.size()-1)(rng);
+        int bestv = pick;
+        int bestc = -1;
+        for (int t = 0; t < 16; t++) {
+            int v = uniform_int_distribution<int>(0, vars.size()-1)(rng);
+            int c = varCostRemovedSelf(v, slotOf[v], roomOf[v]);
+            if (c > bestc){
+                bestc = c;
+                bestv = v;
             }
         }
-        return best;
+        return bestv;
     }
+    void sa(int maxIters = 400000, double T0 = 5.0, double alpha = 0.9995) {
+        int curCost = totalCost();
+        bestCost = curCost;
+        bestAssign = slotOf;
+        bestAssignRooms = roomOf;
 
-    bool dfs(vector<int>& curAssigned, vector<int>& curRooms) {
-        int vidx = getVariable(curAssigned);
-        if (vidx == -1) {
-            bestAssign = curAssigned;
-            bestAssignRooms = curRooms;
-            return true;
-        }
-        const Lesson& L = lessons[vars[vidx].lessonIdx];
-        for (int s : orderValues(vidx, curAssigned)) {
-            if (!canAssign(vidx, s, curAssigned)) {
-                continue;
+        uniform_real_distribution<double> U(0.0, 1.0);
+
+        double T = T0;
+        for (int it = 0; it < maxIters; it++) {
+            int v = pickVarBiased();
+
+            int s0 = slotOf[v];
+            int r0 = roomOf[v];
+            int ns = s0;
+            int nr = r0;
+
+            double z = U(rng);
+            if (z < 0.5) {
+                auto ordS = orderValues(v);
+                ns = ordS[ uniform_int_distribution<int>(0, (int)ordS.size()-1)(rng) ];
+                auto ordR = orderRooms(v, ns);
+                nr = ordR[ uniform_int_distribution<int>(0, (int)ordR.size()-1)(rng) ];
+            } else if (z < 0.8) {
+                auto ordR = orderRooms(v, s0);
+                nr = ordR[ uniform_int_distribution<int>(0, (int)ordR.size()-1)(rng) ];
+            } else {
+                auto ordS = orderValues(v);
+                ns = ordS[ uniform_int_distribution<int>(0, (int)ordS.size()-1)(rng) ];
+                auto ordR = orderRooms(v, ns);
+                nr = ordR[ uniform_int_distribution<int>(0, (int)ordR.size()-1)(rng) ];
             }
-            for (int r : orderRooms(vidx, s, curAssigned)) {
-                if (roomBusy[s][r]) {
-                    continue;
+
+            int d = deltaMove(v, ns, nr);
+            if (d <= 0 || U(rng) < exp(-d / max(1e-9, T))) {
+                applyMove(v, ns, nr);
+                curCost += d;
+                if (curCost < bestCost) {
+                    bestCost = curCost;
+                    bestAssign = slotOf;
+                    bestAssignRooms = roomOf;
+                    if (bestCost == 0) break;
                 }
-                curAssigned[vidx] = s;
-                curRooms[vidx] = r;
-                teacherBusy[s][L.teacher] = true;
-                groupBusy[s][L.group] = true;
-                roomBusy[s][r] = true;
-                if (dfs(curAssigned, curRooms)) {
-                    return true;
-                }
-                curAssigned[vidx] = -1;
-                curRooms[vidx] = -1;
-                teacherBusy[s][L.teacher] = false;
-                groupBusy[s][L.group] = false;
-                roomBusy[s][r] = false;
             }
+
+            T *= alpha;
         }
-        return false;
+
+        slotOf = bestAssign;
+        roomOf = bestAssignRooms;
+        for (int s = 0; s < numSlots; ++s) {
+            fill(teacherBusy[s].begin(), teacherBusy[s].end(), 0);
+            fill(groupBusy[s].begin(),   groupBusy[s].end(),   0);
+            fill(roomBusy[s].begin(),    roomBusy[s].end(),    0);
+        }
+        for (int v = 0; v < (int)vars.size(); ++v) {
+            const Lesson& L = lessons[vars[v].lessonIdx];
+            teacherBusy[slotOf[v]][L.teacher]++;
+            groupBusy  [slotOf[v]][L.group]++;
+            roomBusy   [slotOf[v]][roomOf[v]]++;
+        }
     }
 };
 
+/// ====== GENERATOR "NA STYK" ======
 int main() {
-    const int days = 5, periods = 8;
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    const int DAYS = 5, PERIODS = 5; // 25 slotów/tydzień na salę
     vector<Slot> slots;
-    slots.reserve(days * periods);
-    for (int d = 0; d < days; ++d) {
-        for (int p = 0; p < periods; ++p) {
+    slots.reserve(DAYS * PERIODS);
+    for (int d = 0; d < DAYS; ++d)
+        for (int p = 0; p < PERIODS; ++p)
             slots.push_back({ (int)slots.size(), d, p });
-        }
-    }
 
-    // 12 sal: 0..2 matematyczne, 3..6 językowe, 7..8 lab, 9..10 sala gimn., 11 ogólna/historia
-    vector<Room> rooms = {
-        {0, 30, "R101 (math)"}, {1, 28, "R102 (math)"}, {2, 26, "R103 (math)"},
-        {3, 24, "R201 (lang)"}, {4, 24, "R202 (lang)"}, {5, 24, "R203 (lang)"}, {6, 24, "R204 (lang)"},
-        {7, 22, "R301 (lab)"},  {8, 22, "R302 (lab)"},
-        {9,  40, "G401 (gym)"}, {10, 40, "G402 (gym)"},
-        {11, 26, "R501 (hist/general)"}
+    // Sale - dobrane tak, by pojemność == popyt
+    vector<Room> rooms;
+    auto addRooms = [&](int cnt, int cap, string base) {
+        for (int i = 0; i < cnt; ++i)
+            rooms.push_back({ (int)rooms.size(), cap, base + to_string(i) });
     };
+    addRooms(5,  30, "Math-"); // 5 * 25 = 125
+    addRooms(10, 28, "Gen-");  // 10 * 25 = 250
+    addRooms(5,  22, "Lab-");  // 5 * 25 = 125
+    addRooms(3,  36, "Gym-");  // 3 * 25 = 75
+    addRooms(6,  24, "Lang-"); // 6 * 25 = 150
 
-    vector<int> ALL_SLOTS;
-    ALL_SLOTS.reserve(slots.size());
-    for (int i = 0; i < (int)slots.size(); ++i) ALL_SLOTS.push_back(i);
-
-    // grupy: dla każdej klasy c: base=3*c -> [base]=pełna klasa, [base+1]=G1, [base+2]=G2
-    const int classes = 10; // C1..C10
+    const int CLASSES = 25; // kluczowe dla "na styk"
     vector<string> groupName;
-    groupName.reserve(classes * 3);
-    for (int c = 0; c < classes; ++c) {
+    groupName.reserve(CLASSES * 3);
+    for (int c = 0; c < CLASSES; ++c) {
         string cname = "C" + to_string(c + 1);
-        groupName.push_back(cname);
-        groupName.push_back(cname + "_G1");
-        groupName.push_back(cname + "_G2");
+        groupName.push_back(cname);           // FULL
+        groupName.push_back(cname + "_G1");   // G1
+        groupName.push_back(cname + "_G2");   // G2
     }
-    int numGroups = (int)groupName.size(); // 30
+    int numGroups = (int)groupName.size();
 
-    // nauczyciele 0..15 (16 osób)
-    vector<string> teacherName(16);
-    for (int t = 0; t < 16; ++t) teacherName[t] = "T" + to_string(t);
-    int numTeachers = (int)teacherName.size();
+    // Nauczyciele: dla prostoty każdy przedmiot ma własną pulę po 25 osób (po 1 na klasę)
+    const int TEACHERS = 12 * CLASSES; // 12 "przedmiotów" wg poniższego przypisania
+    vector<string> teacherName(TEACHERS);
+    for (int t = 0; t < TEACHERS; ++t) teacherName[t] = "T" + to_string(t);
 
-    // zestawy sal wg „typów”
-    const vector<int> MATH_ROOMS   = {0,1,2};
-    const vector<int> LANG_ROOMS   = {3,4,5,6};
-    const vector<int> LAB_ROOMS    = {7,8};
-    const vector<int> GYM_ROOMS    = {9,10};
-    const vector<int> HIST_ROOMS   = {11,3,4}; // ogólna + 2 językowe jako fallback
+    // Wygodne indeksowanie: dla każdego przedmiotu zakres długości CLASSES
+    auto Tmath = [&](int c){ return 0*CLASSES + c; };
+    auto Tpol  = [&](int c){ return 1*CLASSES + c; };
+    auto Thist = [&](int c){ return 2*CLASSES + c; };
+    auto Tphys = [&](int c){ return 3*CLASSES + c; };
+    auto Tbio  = [&](int c){ return 4*CLASSES + c; };
+    auto Tpe   = [&](int c){ return 5*CLASSES + c; };
+    auto Ten1  = [&](int c){ return 6*CLASSES + c; };
+    auto Ten2  = [&](int c){ return 7*CLASSES + c; };
+    auto Tict  = [&](int c){ return 8*CLASSES + c; };
+    auto Tgeo  = [&](int c){ return 9*CLASSES + c; };
+    auto Tmus  = [&](int c){ return 10*CLASSES + c; };
+    auto Tart  = [&](int c){ return 11*CLASSES + c; };
 
-    vector<Lesson> lessons;
-    lessons.reserve(classes * 15);
+    // Domeny slotów – pełne (żeby pojemność zgadzała się z popytem)
+    vector<int> ALL_SLOTS(slots.size());
+    iota(ALL_SLOTS.begin(), ALL_SLOTS.end(), 0);
 
+    // Zbiory sal po typach (indeksy roomId)
+    vector<int> MATH_ROOMS, LANG_ROOMS, LAB_ROOMS, GYM_ROOMS, GEN_ROOMS;
+    for (auto &r : rooms) {
+        if (r.roomName.rfind("Math-", 0) == 0) MATH_ROOMS.push_back(r.roomId);
+        else if (r.roomName.rfind("Lang-", 0) == 0) LANG_ROOMS.push_back(r.roomId);
+        else if (r.roomName.rfind("Lab-", 0) == 0)  LAB_ROOMS.push_back(r.roomId);
+        else if (r.roomName.rfind("Gym-", 0) == 0)  GYM_ROOMS.push_back(r.roomId);
+        else GEN_ROOMS.push_back(r.roomId);
+    }
+
+    // Lekcje: sumy godzin dobrane tak, by łączne zapotrzebowanie == łączna pojemność
+    vector<Lesson> lessons; lessons.reserve(CLASSES * 30);
     auto addLesson = [&](int id, int group, vector<int> colidingGroups,
                          int teacher, string subject, int hours,
-                         vector<int> slotsIdx, vector<int> roomsIdx)
+                         const vector<int>& slotsIdx, const vector<int>& roomsIdx)
     {
-        lessons.push_back({id, group, move(colidingGroups), teacher, subject,
-                           hours, move(slotsIdx), move(roomsIdx)});
+        lessons.push_back({id, group, colidingGroups, teacher, subject, hours,
+                           slotsIdx, roomsIdx});
     };
 
-    int nextLessonId = 0;
+    int nextId = 0;
+    for (int c = 0; c < CLASSES; ++c) {
+        int FULL = 3*c, G1 = FULL+1, G2 = FULL+2;
+        vector<int> CF = {G1, G2}; // FULL koliduje z podgrupami
+        vector<int> CG = {FULL};   // każda podgrupa koliduje z FULL
 
-    // przydział nauczycieli per przedmiot (rotacja)
-    auto T_MATH = [&](int c){ return 0 + (c % 4); };      // 0..3
-    auto T_EN1  = [&](int c){ return 4 + (c % 4); };      // 4..7
-    auto T_EN2  = [&](int c){ return 4 + ((c+1) % 4); };  // 4..7 (przesunięcie)
-    auto T_PHYS = [&](int c){ return 8 + (c % 2); };      // 8..9
-    auto T_HIST = [&](int c){ return 10 + (c % 2); };     // 10..11
-    auto T_PE   = [&](int c){ return 12 + (c % 2); };     // 12..13
-    auto T_POL  = [&](int c){ return 14 + (c % 2); };     // 14..15
+        // Math rooms
+        addLesson(nextId++, FULL, CF, Tmath(c), "Matematyka", 5, ALL_SLOTS, MATH_ROOMS);
 
-    // generujemy ~15h/klasę: Mat(4), Eng G1(2), Eng G2(2), Phys(2), Hist(2), PE(2), Polish(3)
-    for (int c = 0; c < classes; ++c) {
-        int base = 3 * c;
-        int FULL = base;
-        int G1 = base + 1;
-        int G2 = base + 2;
+        // General rooms
+        addLesson(nextId++, FULL, CF, Tpol(c),  "Polski",     4, ALL_SLOTS, GEN_ROOMS);
+        addLesson(nextId++, FULL, CF, Thist(c), "Historia",   2, ALL_SLOTS, GEN_ROOMS);
+        addLesson(nextId++, FULL, CF, Tgeo(c),  "Geografia",  2, ALL_SLOTS, GEN_ROOMS);
+        addLesson(nextId++, FULL, CF, Tmus(c),  "Muzyka",     1, ALL_SLOTS, GEN_ROOMS);
+        addLesson(nextId++, FULL, CF, Tart(c),  "Plastyka",   1, ALL_SLOTS, GEN_ROOMS);
 
-        // pełna klasa koliduje z obiema podgrupami
-        vector<int> COL_FULL = {G1, G2};
-        // każda podgrupa koliduje z pełną klasą (podgrupy mogą iść równolegle)
-        vector<int> COL_G    = {FULL};
+        // Lab rooms
+        addLesson(nextId++, FULL, CF, Tphys(c), "Fizyka",     2, ALL_SLOTS, LAB_ROOMS);
+        addLesson(nextId++, FULL, CF, Tbio(c),  "Biologia",   2, ALL_SLOTS, LAB_ROOMS);
+        addLesson(nextId++, FULL, CF, Tict(c),  "Informatyka",1, ALL_SLOTS, LAB_ROOMS);
 
-        // Matematyka (4h) – pełna klasa – tylko sale MATH_ROOMS
-        addLesson(nextLessonId++, FULL, COL_FULL, T_MATH(c), "Matematyka", 4, ALL_SLOTS, MATH_ROOMS);
+        // Gym rooms
+        addLesson(nextId++, FULL, CF, Tpe(c),   "WF",         3, ALL_SLOTS, GYM_ROOMS);
 
-        // Angielski (2h) – G1 i G2 – sale językowe
-        addLesson(nextLessonId++, G1,   COL_G,    T_EN1(c), "Angielski G1", 2, ALL_SLOTS, LANG_ROOMS);
-        addLesson(nextLessonId++, G2,   COL_G,    T_EN2(c), "Angielski G2", 2, ALL_SLOTS, LANG_ROOMS);
-
-        // Fizyka (2h) – pełna klasa – lab
-        addLesson(nextLessonId++, FULL, COL_FULL, T_PHYS(c), "Fizyka", 2, ALL_SLOTS, LAB_ROOMS);
-
-        // Historia (2h) – pełna klasa – historia/ogólne
-        addLesson(nextLessonId++, FULL, COL_FULL, T_HIST(c), "Historia", 2, ALL_SLOTS, HIST_ROOMS);
-
-        // WF (2h) – pełna klasa – sala gimn.
-        addLesson(nextLessonId++, FULL, COL_FULL, T_PE(c), "WF", 2, ALL_SLOTS, GYM_ROOMS);
-
-        // Polski (3h) – pełna klasa – ogólne/językowe
-        addLesson(nextLessonId++, FULL, COL_FULL, T_POL(c), "Polski", 3, ALL_SLOTS, HIST_ROOMS);
+        // Language rooms (podział na G1/G2)
+        addLesson(nextId++, G1,   CG,  Ten1(c), "Angielski G1", 3, ALL_SLOTS, LANG_ROOMS);
+        addLesson(nextId++, G2,   CG,  Ten2(c), "Angielski G2", 3, ALL_SLOTS, LANG_ROOMS);
     }
 
-    Solver solver(slots, lessons, rooms, numGroups, numTeachers);
+    Solver solver(slots, lessons, rooms,
+                  /*numGroups=*/(int)groupName.size(),
+                  /*numTeachers=*/(int)teacherName.size());
 
-    vector<int> curAssigned(solver.vars.size(), -1);
-    vector<int> curRooms(solver.vars.size(), -1);
+    solver.buildInitial();
+    solver.sa(1200000, 2.5, 0.99995);
 
-    bool ok = solver.dfs(curAssigned, curRooms);
-    if (!ok) {
-        cout << "Brak rozwiazania.\n";
-        return 0;
-    }
 
+    // Wyświetl siatkę
     vector<vector<string>> timetable(slots.size());
-    for (int vid = 0; vid < (int)solver.vars.size(); ++vid) {
-        int s = solver.bestAssign[vid];
-        int r = solver.bestAssignRooms[vid];
-        const Lesson& L = solver.lessons[solver.vars[vid].lessonIdx];
-        string entry = groupName[L.group] + " " + L.subject +
-                       " (" + teacherName[L.teacher] + "), " +
-                       rooms[r].roomName;
+    for (int v = 0; v < (int)solver.vars.size(); ++v) {
+        int s = solver.bestAssign[v];
+        int r = solver.bestAssignRooms[v];
+        const Lesson& L = solver.lessons[ solver.vars[v].lessonIdx ];
+        string entry = "G" + to_string(L.group) + " " + L.subject +
+                       " (T" + to_string(L.teacher) + "), " +
+                       solver.rooms[r].roomName;
         timetable[s].push_back(entry);
     }
-
     for (auto& s : slots) {
         cout << "Dzien " << s.day << " | Lekcja " << s.period << " : ";
-        if (timetable[s.id].empty()) cout << "-";
-        else {
-            for (int i = 0; i < (int)timetable[s.id].size(); ++i) {
-                if (i) cout << " | ";
-                cout << timetable[s.id][i];
-            }
+        if (timetable[s.id].empty()) { cout << "-\n"; continue; }
+        for (int i = 0; i < (int)timetable[s.id].size(); ++i) {
+            if (i) cout << " | ";
+            cout << timetable[s.id][i];
         }
         cout << "\n";
     }
+    cerr << "Koszt koncowy: " << solver.bestCost << "\n";
     return 0;
 }
