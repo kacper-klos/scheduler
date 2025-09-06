@@ -10,10 +10,11 @@ public:
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
 private:
     QVector<QVector<QString>> data_;
-    QVector<QString> column_header_;
-    QVector<QString> time_column_;
+    QVector<QString> header_column_;
+    QVector<QString> header_row_;
 };
