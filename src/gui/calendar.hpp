@@ -2,6 +2,14 @@
 
 #include <QAbstractTableModel>
 #include <QString>
+#include <QTime>
+
+struct Event {
+    QString title;
+    QTime start;
+    QTime end;
+    int week_day;
+};
 
 class Calendar : public QAbstractTableModel {
     Q_OBJECT
