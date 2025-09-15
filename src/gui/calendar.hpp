@@ -1,6 +1,7 @@
 #pragma once
 
-#include <QAbstractTableModel>
+#include <QGraphicsScene>
+#include <QPainter>
 #include <QString>
 #include <QTime>
 
@@ -11,18 +12,23 @@ struct Event {
     int week_day;
 };
 
-class Calendar : public QAbstractTableModel {
+class Calendar : public QGraphicsScene {
     Q_OBJECT
 public:
-    explicit Calendar(uint8_t hour_start, uint8_t hour_end, QObject *parent = nullptr);
-
-    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
-    int columnCount(const QModelIndex &parent = QModelIndex()) const override;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
-    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    explicit Calendar(uint8_t hour_start = 8, uint8_t hour_end = 18, QObject *parent = nullptr);
 
 private:
-    QVector<QVector<QString>> data_;
-    QVector<QString> header_column_;
-    QVector<QString> header_row_;
+    // Size in px
+    const uint8_t kWorkDays = 5;
+    double hour_height_ = 60;
+    double day_width_ = 160;
+    double column_header_height = 20;
+    double row_header_width = 15;
+    uint8_t hour_start_;
+    uint8_t hour_end_;
+    uint8_t hour_blocks_;
+
+protected:
+    void drawBackground(QPainter *p, const QRectF &r) override;
+    void setSceneRect();
 };
