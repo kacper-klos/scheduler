@@ -11,6 +11,12 @@ struct Event {
     uint8_t week_day;
     QTime start;
     QTime end;
+    mutable uint8_t position = 0;
+    // Comparator
+    bool operator<(const Event &other) const {
+        return (start < other.start) || ((start == other.start) && (end < other.end)) ||
+               ((start == other.start) && (end == other.end) && (title < other.title));
+    }
 };
 
 const QString kDialogTitle = "Event Creator";
