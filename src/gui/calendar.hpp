@@ -1,5 +1,6 @@
 #pragma once
 
+#include "event_creator.hpp"
 #include <QGraphicsScene>
 #include <QPainter>
 #include <QString>
@@ -8,18 +9,22 @@ class Calendar : public QGraphicsScene {
     Q_OBJECT
 public:
     explicit Calendar(uint8_t hour_start = 8, uint8_t hour_end = 18, QObject *parent = nullptr);
+    enum class Location { kNone, kCells, kColumnHeader, kRowHeader };
+    void add_event(Event data);
 
 private:
     // Size in px
-    double hour_height_ = 60;
-    double day_width_ = 160;
-    double column_header_height = 20;
-    double row_header_width = 30;
     uint8_t hour_start_;
     uint8_t hour_end_;
     uint8_t hour_blocks_;
+    Location identify_location(QPointF point);
+    double get_hour_height() { return 60; };
+    double get_day_width() { return 160; };
+    double get_column_header_height() { return 20; };
+    double get_row_header_width() { return 30; };
 
 protected:
-    void drawBackground(QPainter *p, const QRectF &r) override;
+    void drawBackground(QPainter *painter, const QRectF &rectangle) override;
+    void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void setSceneRect();
 };

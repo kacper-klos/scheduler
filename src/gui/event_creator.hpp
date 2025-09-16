@@ -1,4 +1,5 @@
 #pragma once
+
 #include <QComboBox>
 #include <QDialog>
 #include <QLineEdit>
@@ -23,8 +24,8 @@ class EventCreator : public QDialog {
     Q_OBJECT
 
 public:
-    explicit EventCreator(QString title, uint8_t week_day, QTime start_time, QWidget *parent = nullptr);
-    Event GetData();
+    explicit EventCreator(uint8_t week_day, QTime start_time, QWidget *parent = nullptr);
+    Event get_data();
 
 private:
     QLineEdit *title_box_;

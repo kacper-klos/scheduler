@@ -1,8 +1,9 @@
 #include "event_creator.hpp"
 #include "const.hpp"
+#include <QDialogButtonBox>
 #include <QFormLayout>
 
-EventCreator::EventCreator(QString title, uint8_t week_day, QTime start_time, QWidget *parent) : QDialog(parent) {
+EventCreator::EventCreator(uint8_t week_day, QTime start_time, QWidget *parent) : QDialog(parent) {
 
     QDialog::setWindowTitle(kDialogTitle);
 
@@ -20,17 +21,22 @@ EventCreator::EventCreator(QString title, uint8_t week_day, QTime start_time, QW
     end_time_box_ = new QTimeEdit(this);
     end_time_box_->setDisplayFormat("HH:mm");
     end_time_box_->setTime(start_time.addSecs(60 * 60));
+    // Accept button
+    auto *buttons_ = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    connect(buttons_, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttons_, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
     auto *layout = new QFormLayout(this);
     layout->addRow(kTitleRow, title_box_);
     layout->addRow(kDayRowName, day_box_);
     layout->addRow(kStartTimeRowName, start_time_box_);
     layout->addRow(kEndTimeRowName, end_time_box_);
+    layout->addRow(buttons_);
 }
 
-Event EventCreator::GetData() {
-
-    Event event{title_box_->text(), static_cast<uint8_t>(day_box_->currentIndex()), start_time_box_->time(),
+Event EventCreator::get_data() {
+    QString event_title = title_box_->text().isEmpty() ? kDefaultEventTitle : title_box_->text();
+    Event event{event_title, static_cast<uint8_t>(day_box_->currentIndex()), start_time_box_->time(),
                 end_time_box_->time()};
     return event;
 }
