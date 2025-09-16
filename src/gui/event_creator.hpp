@@ -5,18 +5,19 @@
 #include <QLineEdit>
 #include <QTime>
 #include <QTimeEdit>
+#include <compare>
+#include <tuple>
 
 struct Event {
     QString title;
     uint8_t week_day;
     QTime start;
     QTime end;
-    mutable uint8_t position = 0;
     // Comparator
-    bool operator<(const Event &other) const {
-        return (start < other.start) || ((start == other.start) && (end < other.end)) ||
-               ((start == other.start) && (end == other.end) && (title < other.title));
+    auto key() const {
+        return std::make_tuple(start.hour(), start.minute(), end.hour(), end.minute(), title.toStdString(), week_day);
     }
+    std::strong_ordering operator<=>(const Event &other) const { return key() <=> other.key(); }
 };
 
 const QString kDialogTitle = "Event Creator";

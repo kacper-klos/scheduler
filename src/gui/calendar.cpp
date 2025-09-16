@@ -64,62 +64,44 @@ void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *event) {
 }
 
 void Calendar::add_event(Event event_data) {
-    bool need_repaint = this->add_event_data(event_data);
-    // Draw only new event if it can
-    if (!need_repaint) {
-        this->add_event_graphics(event_data);
-    } else {
-        std::multiset<SemiMutablePair<Event, uint8_t>> &events_in_day = events_in_week_[event_data.week_day];
-        for (auto it = events_in_day.begin(); it != events_in_day.end(); ++it) {
-            this->add_event_graphics(event_data);
+    events_in_week_[event_data.week_day].push(event_data);
+    auto event_groups = this->select_event_groups(event_data.week_day);
+    for (uint8_t i = 0; i < event_groups.size(); ++i) {
+        for (Event event : event_groups[i]) {
+            add_event_graphics(event_data, i, event_groups.size());
         }
     }
 }
 
-// Fix
-//
-// Too much shifting in position. Can fit new event without shifting next collisions.
-//
-// Fix
-bool Calendar::add_event_data(Event event_data) {
-    std::multiset<SemiMutablePair<Event, uint8_t>> &events_in_day = events_in_week_[event_data.week_day];
-    uint8_t new_split = weekday_split_[event_data.week_day];
-    auto event_iterator = events_in_day.insert({event_data, 1});
-    bool changed = false;
-    // Calculate new collisions with earlier events
-    auto backward_iterator = event_iterator;
-    --backward_iterator;
-    while (backward_iterator != events_in_day.begin()) {
-        if (event_iterator->first.start < backward_iterator->first.end) {
-            // Increase collisions
-            ++event_iterator->second;
-            ++backward_iterator->second;
-            // Update positions shift
-            ++event_iterator->first.position;
-            new_split = std::max(backward_iterator->second, new_split);
-            --backward_iterator;
+std::vector<std::vector<Event>> Calendar::select_event_groups(uint8_t week_day) {
+    auto events_in_day = events_in_week_[week_day];
+    std::vector<std::vector<Event>> groups;
+    // Assign all events
+    while (!events_in_day.empty()) {
+        // Define optimization values.
+        int minimum_second_difference = 60 * 60 * 24;
+        uint8_t best_group = groups.size();
+        // Take last event.
+        Event event = events_in_day.top();
+        events_in_day.pop();
+        // Loop through groups
+        for (uint8_t i = 0; i < groups.size(); ++i) {
+            int time_difference = groups[i].back().end.secsTo(event.start);
+            // Look for the group with the minimum difference
+            if (time_difference == 0) {
+                best_group = i;
+                i = groups.size();
+            } else if (time_difference > 0 && time_difference < minimum_second_difference) {
+                minimum_second_difference = time_difference;
+                best_group = i;
+            }
         }
-    }
-    // Calculate new colitions with later events
-    auto forward_iterator = event_iterator;
-    ++forward_iterator;
-    while (forward_iterator != events_in_day.end()) {
-        if (event_iterator->first.end > backward_iterator->first.start) {
-            // Increase collisions
-            ++event_iterator->second;
-            ++forward_iterator->second;
-            // Update positions shift
-            ++forward_iterator->first.position;
-            new_split = std::max(forward_iterator->second, new_split);
+        // Create new group if new was not found
+        if (best_group == groups.size()) {
+            groups.push_back({event});
         } else {
-            forward_iterator = events_in_day.end();
+            groups[best_group].push_back(event);
         }
-        ++forward_iterator;
     }
-    // Update split
-    new_split = std::max(event_iterator->second, new_split);
-    if (new_split != weekday_split_[event_data.week_day]) {
-        changed = true;
-    }
-    return changed;
+    return groups;
 }

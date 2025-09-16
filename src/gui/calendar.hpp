@@ -5,7 +5,7 @@
 #include <QGraphicsScene>
 #include <QPainter>
 #include <QString>
-#include <set>
+#include <queue>
 
 class Calendar : public QGraphicsScene {
     Q_OBJECT
@@ -20,14 +20,14 @@ private:
     uint8_t hour_end_;
     uint8_t hour_blocks_;
     Location identify_location(QPointF point);
-    std::multiset<SemiMutablePair<Event, uint8_t>> events_in_week_[kWeekDaysSize];
+    std::priority_queue<Event, std::vector<Event>, std::greater<Event>> events_in_week_[kWeekDaysSize];
     uint8_t weekday_split_[kWeekDaysSize] = {0};
     double get_hour_height() { return 60; };
     double get_day_width() { return 160; };
     double get_column_header_height() { return 20; };
     double get_row_header_width() { return 30; };
-    bool add_event_data(Event event_data);
-    void add_event_graphics(Event event_data);
+    std::vector<std::vector<Event>> select_event_groups(uint8_t week_day);
+    void add_event_graphics(Event event_data, uint8_t event_group, uint8_t group_size);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rectangle) override;
