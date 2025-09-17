@@ -34,9 +34,9 @@ EventCreator::EventCreator(uint8_t week_day, QTime start_time, QWidget *parent) 
     layout->addRow(buttons_);
 }
 
-Event EventCreator::get_data() {
+EventData EventCreator::get_data() {
     QString event_title = title_box_->text().isEmpty() ? kDefaultEventTitle : title_box_->text();
-    Event event{event_title, static_cast<uint8_t>(day_box_->currentIndex()), start_time_box_->time(),
-                end_time_box_->time()};
+    EventData event{event_title, static_cast<uint8_t>(day_box_->currentIndex()), start_time_box_->time(),
+                    end_time_box_->time()};
     return event;
 }

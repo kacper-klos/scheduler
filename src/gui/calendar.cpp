@@ -63,30 +63,35 @@ void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *event) {
     }
 }
 
-void Calendar::add_event(Event event_data) {
-    events_in_week_[event_data.week_day].push(event_data);
-    auto event_groups = this->select_event_groups(event_data.week_day);
+void Calendar::Event::set_rectangle(QRectF new_rectangle) {
+    prepareGeometryChange();
+    rectangle_ = new_rectangle;
+    update();
+}
+
+void Calendar::add_event(EventData event_data) {
+    Calendar::Event *new_event = new Calendar::Event(event_data);
+    events_[event_data.week_day].insert(new_event);
+    std::vector<std::vector<Calendar::Event *>> event_groups = this->select_event_groups(event_data.week_day);
     for (uint8_t i = 0; i < event_groups.size(); ++i) {
-        for (Event event : event_groups[i]) {
-            add_event_graphics(event_data, i, event_groups.size());
+        for (Event *event : event_groups[i]) {
+            this->add_event_graphics(event, i);
         }
     }
 }
 
-std::vector<std::vector<Event>> Calendar::select_event_groups(uint8_t week_day) {
-    auto events_in_day = events_in_week_[week_day];
-    std::vector<std::vector<Event>> groups;
+std::vector<std::vector<Calendar::Event *>> Calendar::select_event_groups(uint8_t week_day) {
+    std::vector<std::vector<Event *>> groups;
     // Assign all events
-    while (!events_in_day.empty()) {
+    for (auto *event : events_[week_day]) {
+        // Get data
+        EventData event_data = event->get_event_data();
         // Define optimization values.
         int minimum_second_difference = 60 * 60 * 24;
         uint8_t best_group = groups.size();
-        // Take last event.
-        Event event = events_in_day.top();
-        events_in_day.pop();
         // Loop through groups
         for (uint8_t i = 0; i < groups.size(); ++i) {
-            int time_difference = groups[i].back().end.secsTo(event.start);
+            int time_difference = groups[i].back()->get_event_data().end.secsTo(event_data.start);
             // Look for the group with the minimum difference
             if (time_difference == 0) {
                 best_group = i;

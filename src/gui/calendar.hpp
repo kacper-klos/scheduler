@@ -2,17 +2,37 @@
 
 #include "const.hpp"
 #include "event_creator.hpp"
+#include <QGraphicsObject>
 #include <QGraphicsScene>
 #include <QPainter>
 #include <QString>
-#include <queue>
+#include <set>
 
 class Calendar : public QGraphicsScene {
     Q_OBJECT
 public:
     explicit Calendar(uint8_t hour_start = 8, uint8_t hour_end = 18, QObject *parent = nullptr);
     enum class Location { kNone, kCells, kColumnHeader, kRowHeader };
-    void add_event(Event event_data);
+    void add_event(EventData event_data);
+    // Class for event
+    class Event : public QGraphicsObject {
+        Q_OBJECT
+    public:
+        explicit Event(EventData &event, QGraphicsItem *parent = nullptr)
+            : event_data_(event), QGraphicsObject(parent) {};
+        std::strong_ordering operator<=>(const Event other) const { return event_data_ <=> other.event_data_; };
+        QRectF boundingRect() const override { return rectangle_; };
+        // Rect should already be painted
+        void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) override {};
+        EventData get_event_data() const { return event_data_; };
+    signals:
+        void clicked(QPointF position);
+
+    private:
+        void set_rectangle(QRectF rectangle);
+        EventData event_data_;
+        QRectF rectangle_ = QRectF();
+    };
 
 private:
     // Size in px
@@ -20,14 +40,15 @@ private:
     uint8_t hour_end_;
     uint8_t hour_blocks_;
     Location identify_location(QPointF point);
-    std::priority_queue<Event, std::vector<Event>, std::greater<Event>> events_in_week_[kWeekDaysSize];
+    std::multiset<Event *> events_[kWeekDaysSize];
     uint8_t weekday_split_[kWeekDaysSize] = {0};
-    double get_hour_height() { return 60; };
-    double get_day_width() { return 160; };
-    double get_column_header_height() { return 20; };
-    double get_row_header_width() { return 30; };
-    std::vector<std::vector<Event>> select_event_groups(uint8_t week_day);
-    void add_event_graphics(Event event_data, uint8_t event_group, uint8_t group_size);
+    double get_hour_height() const { return 60; };
+    double get_day_width() const { return 160; };
+    double get_column_header_height() const { return 20; };
+    double get_row_header_width() const { return 30; };
+    double get_event_padding() const { return 1; };
+    std::vector<std::vector<Event *>> select_event_groups(uint8_t week_day);
+    void add_event_graphics(Event *event, uint8_t event_group);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rectangle) override;

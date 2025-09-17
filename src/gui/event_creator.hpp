@@ -8,7 +8,7 @@
 #include <compare>
 #include <tuple>
 
-struct Event {
+struct EventData {
     QString title;
     uint8_t week_day;
     QTime start;
@@ -17,7 +17,7 @@ struct Event {
     auto key() const {
         return std::make_tuple(start.hour(), start.minute(), end.hour(), end.minute(), title.toStdString(), week_day);
     }
-    std::strong_ordering operator<=>(const Event &other) const { return key() <=> other.key(); }
+    std::strong_ordering operator<=>(const EventData &other) const { return key() <=> other.key(); }
 };
 
 const QString kDialogTitle = "Event Creator";
@@ -32,7 +32,7 @@ class EventCreator : public QDialog {
 
 public:
     explicit EventCreator(uint8_t week_day, QTime start_time, QWidget *parent = nullptr);
-    Event get_data();
+    EventData get_data();
 
 private:
     QLineEdit *title_box_;
