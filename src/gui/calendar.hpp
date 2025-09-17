@@ -22,7 +22,7 @@ private:
     uint8_t hour_start_;
     uint8_t hour_end_;
     Location identify_location(QPointF point);
-    std::multiset<Event *> events_[kWeekDaysSize];
+    std::multiset<Event *, DereferencedLess<Event>> events_[kWeekDaysSize];
     uint8_t weekday_split_[kWeekDaysSize] = {0};
     double get_hour_height() const { return 60; };
     double get_day_width() const { return 160; };
@@ -48,7 +48,7 @@ class Event : public QGraphicsObject {
 
 public:
     explicit Event(EventData &event, QGraphicsItem *parent = nullptr) : event_data_(event), QGraphicsObject(parent) {};
-    std::strong_ordering operator<=>(const Event other) const { return event_data_ <=> other.event_data_; };
+    std::strong_ordering operator<=>(const Event &other) const { return event_data_ <=> other.event_data_; };
     QRectF boundingRect() const override { return rectangle_; };
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) override;
     EventData get_event_data() const { return event_data_; };

@@ -119,6 +119,7 @@ std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day
     std::vector<std::vector<Event *>> groups;
     // Assign all events
     for (auto *event : events_[week_day]) {
+        qDebug() << event->get_event_data().start;
         // Get data
         EventData event_data = event->get_event_data();
         // Define optimization values.
