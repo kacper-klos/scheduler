@@ -38,7 +38,6 @@ private:
     // Size in px
     uint8_t hour_start_;
     uint8_t hour_end_;
-    uint8_t hour_blocks_;
     Location identify_location(QPointF point);
     std::multiset<Event *> events_[kWeekDaysSize];
     uint8_t weekday_split_[kWeekDaysSize] = {0};
@@ -46,9 +45,13 @@ private:
     double get_day_width() const { return 160; };
     double get_column_header_height() const { return 20; };
     double get_row_header_width() const { return 30; };
-    double get_event_padding() const { return 1; };
+    double get_event_x_padding() const { return 1; };
+    double get_event_y_padding() const { return 0; };
+
     std::vector<std::vector<Event *>> select_event_groups(uint8_t week_day);
     void add_event_graphics(Event *event, uint8_t event_group);
+    double get_time_y_dimension(QTime time);
+    double get_day_x_dimension(double day);
 
 protected:
     void drawBackground(QPainter *painter, const QRectF &rectangle) override;

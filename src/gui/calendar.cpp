@@ -9,10 +9,10 @@
 #include <assert.h>
 
 Calendar::Calendar(uint8_t hour_start, uint8_t hour_end, QObject *parent)
-    : QGraphicsScene(parent), hour_start_(hour_start), hour_end_(hour_end), hour_blocks_(hour_end - hour_start - 1) {
+    : QGraphicsScene(parent), hour_start_(hour_start), hour_end_(hour_end) {
     assert(hour_end >= hour_start && hour_end <= 24 && hour_start <= 24);
-    double calendar_height = this->hour_blocks_ * this->get_hour_height() + this->get_column_header_height();
-    double calendar_width = this->get_day_width() * kWeekDays.size() + this->get_row_header_width();
+    double calendar_height = this->get_time_y_dimension(QTime(hour_end, 0));
+    double calendar_width = this->get_day_x_dimension(kWeekDays.size());
     QGraphicsScene::setSceneRect(0, 0, calendar_width, calendar_height);
 }
 
@@ -20,13 +20,13 @@ void Calendar::drawBackground(QPainter *painter, const QRectF &rectangle) {
     painter->fillRect(rectangle, Qt::white);
     painter->setPen(QPen(Qt::blue, 1.5));
     // Draw horizontal lines.
-    for (uint8_t hour_block = 0; hour_block <= this->hour_blocks_; ++hour_block) {
-        double y = hour_block * this->get_hour_height() + this->get_column_header_height();
+    for (uint8_t hour = hour_start_; hour <= hour_end_; ++hour) {
+        double y = get_time_y_dimension(QTime(hour, 0));
         painter->drawLine(rectangle.left(), y, rectangle.right(), y);
     }
     // Draw vertical lines.
-    for (uint8_t day = 0; day <= kWeekDays.size(); ++day) {
-        double x = day * this->get_day_width() + this->get_row_header_width();
+    for (uint8_t day = 0; day <= kWeekDaysSize; ++day) {
+        double x = get_day_x_dimension(day);
         painter->drawLine(x, rectangle.top(), x, rectangle.bottom());
     }
 }
@@ -43,6 +43,17 @@ Calendar::Location Calendar::identify_location(QPointF point) {
     } else {
         return Calendar::Location::kCells;
     }
+}
+
+double Calendar::get_time_y_dimension(QTime time) {
+    double y = this->get_column_header_height() +
+               this->get_hour_height() * ((time.hour() - hour_start_) + static_cast<double>(time.minute()) / 60);
+    return y;
+}
+
+double Calendar::get_day_x_dimension(double day) {
+    double x = this->get_row_header_width() + this->get_day_width() * day;
+    return x;
 }
 
 void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *event) {
@@ -108,5 +119,6 @@ std::vector<std::vector<Calendar::Event *>> Calendar::select_event_groups(uint8_
             groups[best_group].push_back(event);
         }
     }
+    weekday_split_[week_day] = groups.size();
     return groups;
 }
