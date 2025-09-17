@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QStringList>
-#include <compare>
 
 constexpr uint8_t kWeekDaysSize = 7;
 const QStringList kWeekDays = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};

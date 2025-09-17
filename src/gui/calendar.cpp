@@ -13,19 +13,42 @@ Calendar::Calendar(uint8_t hour_start, uint8_t hour_end, QObject *parent)
     double calendar_height = this->get_time_y_dimension(QTime(hour_end, 0));
     double calendar_width = this->get_day_x_dimension(kWeekDays.size());
     QGraphicsScene::setSceneRect(0, 0, calendar_width, calendar_height);
+    // Set column header text and position it at the centre
+    for (uint8_t day = 0; day < kWeekDaysSize; ++day) {
+        QGraphicsTextItem *text_item = this->addText(kWeekDays[day], get_day_header_font());
+        QRectF text_block = text_item->boundingRect();
+        text_item->setPos(get_day_x_dimension(day + 0.5) - text_block.width() / 2,
+                          (get_column_header_height() - text_block.height()) / 2);
+        column_header_[day] = text_item;
+    }
+    // Set row header to the upper right corner
+    for (uint8_t hour = hour_start_; hour < hour_end_; ++hour) {
+        QTime hour_time = QTime(hour, 0);
+        QGraphicsTextItem *text_item = this->addText(hour_time.toString("h:mm"), get_hour_header_font());
+        QRectF text_block = text_item->boundingRect();
+        text_item->setPos(get_row_header_width() - text_block.width(), get_time_y_dimension(hour_time));
+        row_header_.push_back(text_item);
+    }
 }
 
 void Calendar::drawBackground(QPainter *painter, const QRectF &rectangle) {
     painter->fillRect(rectangle, Qt::white);
-    painter->setPen(QPen(Qt::blue, 1.5));
-    // Draw horizontal lines.
-    for (uint8_t hour = hour_start_; hour <= hour_end_; ++hour) {
-        double y = get_time_y_dimension(QTime(hour, 0));
-        painter->drawLine(rectangle.left(), y, rectangle.right(), y);
+    // Draw horizontal lines with quarters.
+    for (uint8_t quarter = 4 * hour_start_; quarter <= 4 * hour_end_; ++quarter) {
+        // Convert quarter to hour
+        double y = this->get_time_y_dimension(QTime(quarter / 4, 15 * (quarter % 4)));
+        if (quarter % 4 == 0) {
+            painter->setPen(QPen(Qt::blue, 1.5));
+            painter->drawLine(rectangle.left(), y, rectangle.right(), y);
+        } else {
+            painter->setPen(QPen(Qt::blue, 0.5));
+            painter->drawLine(this->get_row_header_width(), y, rectangle.right(), y);
+        }
     }
     // Draw vertical lines.
+    painter->setPen(QPen(Qt::blue, 1.5));
     for (uint8_t day = 0; day <= kWeekDaysSize; ++day) {
-        double x = get_day_x_dimension(day);
+        double x = this->get_day_x_dimension(day);
         painter->drawLine(x, rectangle.top(), x, rectangle.bottom());
     }
 }
@@ -119,7 +142,6 @@ std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day
     std::vector<std::vector<Event *>> groups;
     // Assign all events
     for (auto *event : events_[week_day]) {
-        qDebug() << event->get_event_data().start;
         // Get data
         EventData event_data = event->get_event_data();
         // Define optimization values.
