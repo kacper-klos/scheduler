@@ -8,31 +8,14 @@
 #include <QString>
 #include <set>
 
+class Event;
+
 class Calendar : public QGraphicsScene {
     Q_OBJECT
 public:
     explicit Calendar(uint8_t hour_start = 8, uint8_t hour_end = 18, QObject *parent = nullptr);
     enum class Location { kNone, kCells, kColumnHeader, kRowHeader };
     void add_event(EventData event_data);
-    // Class for event
-    class Event : public QGraphicsObject {
-        Q_OBJECT
-    public:
-        explicit Event(EventData &event, QGraphicsItem *parent = nullptr)
-            : event_data_(event), QGraphicsObject(parent) {};
-        std::strong_ordering operator<=>(const Event other) const { return event_data_ <=> other.event_data_; };
-        QRectF boundingRect() const override { return rectangle_; };
-        // Rect should already be painted
-        void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) override {};
-        EventData get_event_data() const { return event_data_; };
-    signals:
-        void clicked(QPointF position);
-
-    private:
-        void set_rectangle(QRectF rectangle);
-        EventData event_data_;
-        QRectF rectangle_ = QRectF();
-    };
 
 private:
     // Size in px
@@ -57,4 +40,23 @@ protected:
     void drawBackground(QPainter *painter, const QRectF &rectangle) override;
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void setSceneRect();
+};
+
+class Event : public QGraphicsObject {
+    Q_OBJECT
+    friend Calendar;
+
+public:
+    explicit Event(EventData &event, QGraphicsItem *parent = nullptr) : event_data_(event), QGraphicsObject(parent) {};
+    std::strong_ordering operator<=>(const Event other) const { return event_data_ <=> other.event_data_; };
+    QRectF boundingRect() const override { return rectangle_; };
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) override;
+    EventData get_event_data() const { return event_data_; };
+signals:
+    void clicked(QPointF position);
+
+private:
+    void set_rectangle(QRectF rectangle);
+    EventData event_data_;
+    QRectF rectangle_ = QRectF();
 };

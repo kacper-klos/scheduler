@@ -5,7 +5,6 @@
 #include <QDebug>
 #include <QGraphicsSceneMouseEvent>
 #include <QPainter>
-#include <algorithm>
 #include <assert.h>
 
 Calendar::Calendar(uint8_t hour_start, uint8_t hour_end, QObject *parent)
@@ -74,24 +73,49 @@ void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *event) {
     }
 }
 
-void Calendar::Event::set_rectangle(QRectF new_rectangle) {
+void Event::set_rectangle(QRectF new_rectangle) {
     prepareGeometryChange();
     rectangle_ = new_rectangle;
     update();
 }
 
+void Event::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) {
+    // Check if is valid
+    QRectF rectangle = boundingRect();
+    if (!rectangle.isValid()) {
+        return;
+    }
+    painter->setBrush(Qt::red);
+    painter->setPen(QPen(Qt::red, 1));
+    painter->drawRect(boundingRect());
+}
+
 void Calendar::add_event(EventData event_data) {
-    Calendar::Event *new_event = new Calendar::Event(event_data);
+    Event *new_event = new Event(event_data);
     events_[event_data.week_day].insert(new_event);
-    std::vector<std::vector<Calendar::Event *>> event_groups = this->select_event_groups(event_data.week_day);
+    // Divides into subcolumns and show them
+    std::vector<std::vector<Event *>> event_groups = this->select_event_groups(event_data.week_day);
     for (uint8_t i = 0; i < event_groups.size(); ++i) {
         for (Event *event : event_groups[i]) {
             this->add_event_graphics(event, i);
         }
     }
+    this->addItem(new_event);
 }
 
-std::vector<std::vector<Calendar::Event *>> Calendar::select_event_groups(uint8_t week_day) {
+void Calendar::add_event_graphics(Event *event, uint8_t group) {
+    EventData data = event->get_event_data();
+    // Define dimensions of event
+    double x = get_event_x_padding() +
+               get_day_x_dimension(data.week_day + static_cast<double>(group) / weekday_split_[data.week_day]);
+    double y = get_event_y_padding() + get_time_y_dimension(data.start);
+    double width = get_day_width() / weekday_split_[data.week_day] - get_event_x_padding();
+    double height = get_hour_height() * (static_cast<double>(data.start.secsTo(data.end)) / (60 * 60));
+    QRectF rectangle = QRectF(x, y, width, height);
+    event->set_rectangle(rectangle);
+}
+
+std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day) {
     std::vector<std::vector<Event *>> groups;
     // Assign all events
     for (auto *event : events_[week_day]) {
