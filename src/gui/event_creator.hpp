@@ -1,24 +1,11 @@
 #pragma once
 
+#include "calendar.hpp"
 #include <QComboBox>
 #include <QDialog>
 #include <QLineEdit>
 #include <QTime>
 #include <QTimeEdit>
-#include <compare>
-#include <tuple>
-
-struct EventData {
-    QString title;
-    uint8_t week_day;
-    QTime start;
-    QTime end;
-    // Comparator
-    auto key() const {
-        return std::make_tuple(start.hour(), start.minute(), end.hour(), end.minute(), title.toStdString(), week_day);
-    }
-    std::strong_ordering operator<=>(const EventData &other) const { return key() <=> other.key(); }
-};
 
 const QString kDialogTitle = "Event Creator";
 const QString kDefaultEventTitle = "New Event";
@@ -32,7 +19,7 @@ class EventCreator : public QDialog {
 
 public:
     explicit EventCreator(uint8_t week_day, QTime start_time, QWidget *parent = nullptr);
-    EventData get_data();
+    Event::EventData get_data();
 
 private:
     QLineEdit *title_box_;
