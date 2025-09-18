@@ -15,23 +15,23 @@ Calendar::Calendar(uint8_t hour_start, uint8_t hour_end, QObject *parent)
     const QFont kColumnHeaderFont = QFont("Arial", 12);
     const QFont kRowHeaderFont = QFont("Arial", 8);
     // Define variables
+    for (uint8_t i = 0; i <= kWeekDaysSize; ++i) {
+        day_column_start_[i] = i;
+    }
     double calendar_height = this->get_time_y_dimension(QTime(hour_end, 0));
     double calendar_width = this->get_day_x_dimension(kWeekDays.size());
     QGraphicsScene::setSceneRect(0, 0, calendar_width, calendar_height);
-    // Set column header text and position it at the centre
+    // Create and set column header text.
     for (uint8_t day = 0; day < kWeekDaysSize; ++day) {
         QGraphicsTextItem *text_item = this->addText(kWeekDays[day], kColumnHeaderFont);
-        QRectF text_block = text_item->boundingRect();
-        text_item->setPos(get_day_x_dimension(day + 0.5) - text_block.width() / 2,
-                          (get_column_header_height() - text_block.height()) / 2);
         column_header_[day] = text_item;
     }
-    // Set row header to the upper right corner
+    // Create, set, and position row header to the upper right corners of a cell.
     for (uint8_t hour = hour_start_; hour < hour_end_; ++hour) {
         QTime hour_time = QTime(hour, 0);
         QGraphicsTextItem *text_item = this->addText(hour_time.toString("H:mm"), kRowHeaderFont);
         QRectF text_block = text_item->boundingRect();
-        text_item->setPos(get_row_header_width() - text_block.width(), get_time_y_dimension(hour_time));
+        text_item->setPos(this->get_row_header_width() - text_block.width(), this->get_time_y_dimension(hour_time));
         row_header_.push_back(text_item);
     }
 }
@@ -56,9 +56,18 @@ void Calendar::drawBackground(QPainter *painter, const QRectF &rectangle) {
         double x = this->get_day_x_dimension(day);
         painter->drawLine(x, rectangle.top(), x, rectangle.bottom());
     }
+    // Write day headers text.
+    for (uint8_t day = 0; day < kWeekDaysSize; ++day) {
+        QGraphicsTextItem *text_item = column_header_[day];
+        QRectF text_block = text_item->boundingRect();
+        text_item->setPos(
+            this->get_day_column_x_dimension(0.5 * (day_column_start_[day] + day_column_start_[day + 1])) -
+                text_block.width() / 2,
+            (this->get_column_header_height() - text_block.height()) / 2);
+    }
 }
 
-Calendar::Location Calendar::identify_location(QPointF point) {
+Calendar::Location Calendar::identify_location(QPointF point) const {
     // Outide calendar or empty square in top left.
     if (!sceneRect().contains(point) ||
         (point.x() < this->get_row_header_width() && point.y() < this->get_column_header_height())) {
@@ -72,17 +81,38 @@ Calendar::Location Calendar::identify_location(QPointF point) {
     }
 }
 
-double Calendar::get_time_y_dimension(QTime time) {
+double Calendar::get_time_y_dimension(QTime time) const {
     assert(time.hour() >= hour_start_ && (time.hour() < hour_end_ || (time.hour() == hour_end_ && time.minute() == 0)));
     double y = this->get_column_header_height() +
                this->get_hour_height() * ((time.hour() - hour_start_) + static_cast<double>(time.minute()) / 60);
     return y;
 }
 
-double Calendar::get_day_x_dimension(double day) {
-    assert(day >= 0 && day <= kWeekDaysSize);
-    double x = this->get_row_header_width() + this->get_day_width() * day;
+QTime Calendar::get_y_time_value(double position) const {
+    position -= this->get_column_header_height();
+    position /= this->get_hour_height();
+    uint8_t hour_shift = static_cast<uint8_t>(position);
+    QTime time = QTime(hour_shift + hour_start_, 60 * (position - hour_shift));
+    assert(this->time_in_calendar(time));
+    return time;
+}
+
+double Calendar::get_day_column_x_dimension(double day_column) const {
+    assert(day_column >= 0 && day_column <= day_column_start_[kWeekDaysSize]);
+    double x = this->get_row_header_width() + this->get_day_column_width() * day_column;
     return x;
+}
+
+uint8_t Calendar::get_x_day_value(double position) const {
+    position -= this->get_row_header_width();
+    position /= this->get_day_column_width();
+    // Traverse columns to find the right position
+    for (uint8_t i = 0; i < kWeekDaysSize; ++i) {
+        if (position >= day_column_start_[i] && position < day_column_start_[i + 1]) {
+            return i;
+        }
+    }
+    assert(false);
 }
 
 void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *event) {
@@ -91,11 +121,9 @@ void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *event) {
         return;
     }
     // identify day
-    uint8_t day = (position.x() - this->get_row_header_width()) / this->get_day_width();
+    uint8_t day = this->get_x_day_value(position.x());
     // identify time
-    uint8_t hour_shift = (position.y() - this->get_column_header_height()) / this->get_hour_height();
-    uint8_t quarter = 4 * ((position.y() - this->get_column_header_height()) / this->get_hour_height() - hour_shift);
-    QTime time(hour_shift + hour_start_, 15 * quarter);
+    QTime time = this->get_y_time_value(position.y());
     // Show event creator
     EventCreator event_creator(day, time, QApplication::activeWindow());
     if (event_creator.exec() == QDialog::Accepted) {
@@ -114,10 +142,10 @@ Event::Event(Event::EventData &event_data, QGraphicsItem *parent) : event_data_(
 }
 
 void Event::set_rectangle(QRectF new_rectangle, QPointF position) {
-    prepareGeometryChange();
+    this->prepareGeometryChange();
     this->setPos(position);
     rectangle_ = new_rectangle;
-    update();
+    this->update();
 }
 
 void Event::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) {
@@ -164,16 +192,39 @@ void Calendar::add_event_graphics(Event *event, uint8_t group) {
     constexpr double kEventPaddingY = 3;
     Event::EventData data = event->get_event_data();
     // Define dimensions of event
-    double x =
-        kEventPaddingX + get_day_x_dimension(data.week_day + static_cast<double>(group) / groups_sizes[data.week_day]);
+    double x = kEventPaddingX + this->get_day_column_x_dimension(day_column_start_[data.week_day] + group);
     double y = kEventPaddingY + get_time_y_dimension(data.start);
-    double width = get_day_width() / groups_sizes[data.week_day] - 2 * kEventPaddingX;
+    double width = this->get_day_column_width() - 2 * kEventPaddingX;
     double height =
         get_hour_height() * (static_cast<double>(data.start.secsTo(data.end)) / (60 * 60)) - 2 * kEventPaddingY;
     // Sets the box for event
     QRectF rectangle = QRectF(0, 0, width, height);
     QPointF position = QPointF(x, y);
     event->set_rectangle(rectangle, position);
+}
+
+void Calendar::adjust_day_column_size(uint8_t week_day, uint16_t new_size) {
+    assert(week_day <= kWeekDaysSize && week_day > 0);
+    // Check if the change is even needed
+    if (uint8_t difference = new_size + day_column_start_[week_day] - day_column_start_[week_day + 1];
+        difference != 0) {
+        // Change position of day start and events in later days.
+        for (uint8_t i = week_day + 1; i < kWeekDaysSize; ++i) {
+            day_column_start_[i] += difference;
+            for (QGraphicsObject *event : events_[i]) {
+                QPointF position = event->pos();
+                position.setX(position.x() + difference * this->get_day_column_width());
+                event->setPos(position);
+            }
+        }
+        // Update last value outside loop to not separate for each loop logic.
+        day_column_start_[kWeekDaysSize] += difference;
+        // Modify the size of scene rect
+        QRectF rect = this->sceneRect();
+        rect.setWidth(rect.width() + difference * this->get_day_column_width());
+        this->setSceneRect(rect);
+        this->update();
+    }
 }
 
 std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day) {
@@ -204,6 +255,7 @@ std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day
             groups[best_group].push_back(event);
         }
     }
-    groups_sizes[week_day] = groups.size();
+    // Adjust values for new size
+    adjust_day_column_size(week_day, groups.size());
     return groups;
 }

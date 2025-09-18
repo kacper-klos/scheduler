@@ -101,7 +101,8 @@ public:
     // @param parent QObject owning the scene.
     // @warning Both hour_start and hour_end must be (0-24) and hour_end must be strictly higher than hour_start.
     explicit Calendar(uint8_t hour_start = 8, uint8_t hour_end = 18, QObject *parent = nullptr);
-    // Constants for location on the calendar grid.
+    // @enum Location
+    // @brief Constants for location on the calendar grid.
     enum class Location { kNone, kCells, kColumnHeader, kRowHeader };
     // @brief Create new event visiual based on data.
     //
@@ -109,8 +110,13 @@ public:
     // add_event_graphics on every event in order to refresh positions of every event, finally the event is add to
     // screen.
     //
-    // @param event_data information about new event
+    // @param event_data information about new event.
     void add_event(Event::EventData event_data);
+    // @brief Checks if QTime is present in the calendar.
+    bool time_in_calendar(QTime time) const {
+        return (time.hour() >= hour_start_) &&
+               ((time.hour() < hour_end_) || (time.hour() == hour_end_ && time.minute() == 0));
+    };
 
 private:
     uint8_t hour_start_;
@@ -118,37 +124,41 @@ private:
     // Set of events present on the calendar.
     std::multiset<Event *, DereferencedLess<Event>> events_[kWeekDaysSize];
     // How many subcolumns each of day has.
-    uint8_t groups_sizes[kWeekDaysSize] = {0};
+    uint16_t day_column_start_[kWeekDaysSize + 1];
     // Text representing days of the week.
     QGraphicsTextItem *column_header_[kWeekDaysSize];
     // Text representing hours.
     std::vector<QGraphicsTextItem *> row_header_;
     // Layout values in px
     double get_hour_height() const { return 60; };
-    double get_day_width() const { return 160; };
+    double get_day_column_width() const { return 160; };
     double get_column_header_height() const { return 30; };
     double get_row_header_width() const { return 40; };
     // @brief Translate time into y dimension in pixels.
-    //
-    // Use @ref get_hour_height and @ref get_column_header_height() to find at what y value is the respected time.
-    //
     // @param time Time which location will be returned.
     // @warning time must be in between hour_start_ and hour_end_.
-    double get_time_y_dimension(QTime time);
+    double get_time_y_dimension(QTime time) const;
+    // @brief Translates y dimension to height.
+    // @param position Location to translate.
+    // @warning position must be inside the calendar.
+    QTime get_y_time_value(double position) const;
     // @brief Translate days into x dimension in pixels.
-    //
-    // Use @ref get_day_width() and @ref get_row_header_width() to find at what x value is the respected day.
-    //
     // @param day Day which location will be returned.
     // @warning time must be in between 0 and kWeekDaysSize.
-    double get_day_x_dimension(double day);
+    double get_day_column_x_dimension(double day_column) const;
+    // @brief Simple wrapper of @ref get_day_column_x_dimension() for full days.
+    double get_day_x_dimension(uint8_t day) const { return get_day_column_x_dimension(day_column_start_[day]); };
+    // @brief Translates x dimension to day.
+    // @param position Location to translate.
+    // @warning position must be inside the calendar.
+    uint8_t get_x_day_value(double position) const;
     // @brief Get to what lacation is the point corresponding.
     //
     // Returns kNone if the point is outside the calendar or if point is in the top left corner which is neither a row
     // nor column header.
     //
     // @param point The location of the point which will be identified.
-    Location identify_location(QPointF point);
+    Location identify_location(QPointF point) const;
     // @brief Divides events inside a given day of the week in the most optimal groups.
     //
     // Use greedy algorithm to assign events in a way which minimalize the number of groups.
@@ -156,6 +166,16 @@ private:
     //
     // @param week_day Day of the week from which events will be drawn.
     std::vector<std::vector<Event *>> select_event_groups(uint8_t week_day);
+    // @brief Update the value of calendar in respect to change in one day width change.
+    //
+    // Perform changes only if the value of day_column_start_ needs adjustmen.
+    // Updates day_column_start_ and events corresponding to every day after the week_day.
+    // Update the @ref QRectF of the calendar scene to fit all day columns.
+    //
+    // @param week_day Day of which size is changed.
+    // @param new_size New size for the day.
+    // @warning week_day must be in [0, kWeekDaysSize].
+    void adjust_day_column_size(uint8_t week_day, uint16_t new_size);
     // @brief Helper function for creating @ref QRectF() for an event.
     //
     // Based on the event_group and @ref groups_sizes defines the size of @ref QrectF() on which Event will be based and
