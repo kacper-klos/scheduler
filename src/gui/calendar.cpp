@@ -9,13 +9,18 @@
 
 Calendar::Calendar(uint8_t hour_start, uint8_t hour_end, QObject *parent)
     : QGraphicsScene(parent), hour_start_(hour_start), hour_end_(hour_end) {
+    // Checks input
     assert(hour_end >= hour_start && hour_end <= 24 && hour_start <= 24);
+    // Define constants used in function
+    const QFont kColumnHeaderFont = QFont("Arial", 12);
+    const QFont kRowHeaderFont = QFont("Arial", 8);
+    // Define variables
     double calendar_height = this->get_time_y_dimension(QTime(hour_end, 0));
     double calendar_width = this->get_day_x_dimension(kWeekDays.size());
     QGraphicsScene::setSceneRect(0, 0, calendar_width, calendar_height);
     // Set column header text and position it at the centre
     for (uint8_t day = 0; day < kWeekDaysSize; ++day) {
-        QGraphicsTextItem *text_item = this->addText(kWeekDays[day], get_day_header_font());
+        QGraphicsTextItem *text_item = this->addText(kWeekDays[day], kColumnHeaderFont);
         QRectF text_block = text_item->boundingRect();
         text_item->setPos(get_day_x_dimension(day + 0.5) - text_block.width() / 2,
                           (get_column_header_height() - text_block.height()) / 2);
@@ -24,7 +29,7 @@ Calendar::Calendar(uint8_t hour_start, uint8_t hour_end, QObject *parent)
     // Set row header to the upper right corner
     for (uint8_t hour = hour_start_; hour < hour_end_; ++hour) {
         QTime hour_time = QTime(hour, 0);
-        QGraphicsTextItem *text_item = this->addText(hour_time.toString("h:mm"), get_hour_header_font());
+        QGraphicsTextItem *text_item = this->addText(hour_time.toString("H:mm"), kRowHeaderFont);
         QRectF text_block = text_item->boundingRect();
         text_item->setPos(get_row_header_width() - text_block.width(), get_time_y_dimension(hour_time));
         row_header_.push_back(text_item);
@@ -96,8 +101,19 @@ void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *event) {
     }
 }
 
-void Event::set_rectangle(QRectF new_rectangle) {
+Event::Event(EventData &event, QGraphicsItem *parent) : event_data_(event), QGraphicsObject(parent) {
+    // Initialize text
+    title_text_ = new QGraphicsTextItem(this);
+    time_text_ = new QGraphicsTextItem(this);
+    // Limit objects the the event block size
+    this->setFlag(QGraphicsItem::ItemClipsChildrenToShape, true);
+    this->title_text_->setDefaultTextColor(Qt::black);
+    this->time_text_->setDefaultTextColor(Qt::black);
+}
+
+void Event::set_rectangle(QRectF new_rectangle, QPointF position) {
     prepareGeometryChange();
+    this->setPos(position);
     rectangle_ = new_rectangle;
     update();
 }
@@ -127,15 +143,34 @@ void Calendar::add_event(EventData event_data) {
 }
 
 void Calendar::add_event_graphics(Event *event, uint8_t group) {
+    // Define constants used in this function
+    constexpr double kEventPaddingX = 3;
+    constexpr double kEventPaddingY = 3;
+    constexpr double kTextPaddingX = 2;
+    constexpr double kTextPaddingY = 1;
     EventData data = event->get_event_data();
     // Define dimensions of event
-    double x = get_event_x_padding() +
+    double x = kEventPaddingX +
                get_day_x_dimension(data.week_day + static_cast<double>(group) / weekday_split_[data.week_day]);
-    double y = get_event_y_padding() + get_time_y_dimension(data.start);
-    double width = get_day_width() / weekday_split_[data.week_day] - get_event_x_padding();
-    double height = get_hour_height() * (static_cast<double>(data.start.secsTo(data.end)) / (60 * 60));
-    QRectF rectangle = QRectF(x, y, width, height);
-    event->set_rectangle(rectangle);
+    double y = kEventPaddingY + get_time_y_dimension(data.start);
+    double width = get_day_width() / weekday_split_[data.week_day] - 2 * kEventPaddingX;
+    double height =
+        get_hour_height() * (static_cast<double>(data.start.secsTo(data.end)) / (60 * 60)) - 2 * kEventPaddingY;
+    // Sets the box for event
+    QRectF rectangle = QRectF(0, 0, width, height);
+    QPointF position = QPointF(x, y);
+    event->set_rectangle(rectangle, position);
+    // Writes text in event
+    event->title_text_->setFont(QFont("Inter", static_cast<int>(width * 0.08)));
+    event->title_text_->setPlainText(event->event_data_.title);
+    event->title_text_->setPos(kTextPaddingX, kTextPaddingY);
+    event->title_text_->setTextWidth(width - 2 * kTextPaddingX);
+
+    event->time_text_->setFont(QFont("Inter", static_cast<int>(width * 0.06)));
+    event->time_text_->setPlainText(event->event_data_.start.toString("H:mm") + " - " +
+                                    event->event_data_.end.toString("H:mm"));
+    event->time_text_->setPos(kTextPaddingX, event->title_text_->boundingRect().height());
+    event->time_text_->setTextWidth(width - 2 * kTextPaddingX);
 }
 
 std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day) {

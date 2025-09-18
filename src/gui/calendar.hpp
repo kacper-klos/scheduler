@@ -30,10 +30,6 @@ private:
     double get_day_width() const { return 160; };
     double get_column_header_height() const { return 30; };
     double get_row_header_width() const { return 40; };
-    double get_event_x_padding() const { return 1; };
-    double get_event_y_padding() const { return 0; };
-    QFont get_day_header_font() const { return QFont("Arial", 12); };
-    QFont get_hour_header_font() const { return QFont("Arial", 8); };
 
     double get_time_y_dimension(QTime time);
     double get_day_x_dimension(double day);
@@ -53,7 +49,7 @@ class Event : public QGraphicsObject {
     friend Calendar;
 
 public:
-    explicit Event(EventData &event, QGraphicsItem *parent = nullptr) : event_data_(event), QGraphicsObject(parent) {};
+    explicit Event(EventData &event, QGraphicsItem *parent = nullptr);
     std::strong_ordering operator<=>(const Event &other) const { return event_data_ <=> other.event_data_; };
     QRectF boundingRect() const override { return rectangle_; };
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) override;
@@ -62,7 +58,9 @@ signals:
     void clicked(QPointF position);
 
 private:
-    void set_rectangle(QRectF rectangle);
+    void set_rectangle(QRectF rectangle, QPointF position);
     EventData event_data_;
     QRectF rectangle_ = QRectF();
+    QGraphicsTextItem *title_text_ = nullptr;
+    QGraphicsTextItem *time_text_ = nullptr;
 };
