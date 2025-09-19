@@ -2,6 +2,7 @@
 #include "const.hpp"
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QLineEdit>
 
 EventCreator::EventCreator(uint8_t week_day, QTime start_time, QWidget *parent) : QDialog(parent) {
 
@@ -11,7 +12,7 @@ EventCreator::EventCreator(uint8_t week_day, QTime start_time, QWidget *parent) 
     title_box_->setPlaceholderText(kDefaultEventTitle);
     // Day of the week selection.
     day_box_ = new QComboBox(this);
-    day_box_->addItems(kWeekDays);
+    day_box_->addItems(kWeekDays.mid(0, kWeekDaysSize));
     day_box_->setCurrentIndex(week_day);
     // Start time.
     start_time_box_ = new QTimeEdit(this);

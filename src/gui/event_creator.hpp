@@ -1,13 +1,12 @@
 // @file event_creator.hpp
 // @brief User interface for creating new Events.
 
-#pragma once
+#ifndef EVENT_CREATOR_HPP_
+#define EVENT_CREATOR_HPP_
 
-#include "calendar.hpp"
+#include "event.hpp"
 #include <QComboBox>
 #include <QDialog>
-#include <QLineEdit>
-#include <QTime>
 #include <QTimeEdit>
 
 // @class EventCreator
@@ -28,16 +27,20 @@ public:
 
 private:
     // Constants
-    const QString kDialogTitle = "Event Creator";
-    const QString kDefaultEventTitle = "New Event";
-    const QString kTitleRow = "Title: ";
-    const QString kDayRowName = "Day: ";
-    const QString kStartTimeRowName = "Starting time: ";
-    const QString kEndTimeRowName = "End time: ";
-    const QTime kDefaultTimeSpacing = QTime(1, 0);
+    inline static const QString kDialogTitle = "Event Creator";
+    inline static const QString kDefaultEventTitle = "New Event";
+    inline static const QString kTitleRow = "Title: ";
+    inline static const QString kDayRowName = "Day: ";
+    inline static const QString kStartTimeRowName = "Starting time: ";
+    inline static const QString kEndTimeRowName = "End time: ";
+    inline static const QStringList kWeekDays = {"Monday", "Tuesday",  "Wednesday", "Thursday",
+                                                 "Friday", "Saturday", "Sunday"};
+    inline static const QTime kDefaultTimeSpacing = QTime(1, 0);
     // Boxes of the widget which take the input.
     QLineEdit *title_box_;
     QComboBox *day_box_;
     QTimeEdit *start_time_box_;
     QTimeEdit *end_time_box_;
 };
+
+#endif

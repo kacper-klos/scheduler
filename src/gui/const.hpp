@@ -1,6 +1,8 @@
 // @file const.hpp
 // @brief Helper file with constants and helper functions.
-#pragma once
+
+#ifndef CONST_HPP_
+#define CONST_HPP_
 
 #include <QStringList>
 
@@ -12,3 +14,5 @@ inline const QStringList kWeekDays = {"Monday", "Tuesday", "Wednesday", "Thursda
 template <class T> struct DereferencedLess {
     bool operator()(const T *a, const T *b) const { return (*a < *b) || (!(*a > *b) && a < b); }
 };
+
+#endif

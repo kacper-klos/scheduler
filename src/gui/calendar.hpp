@@ -6,86 +6,13 @@
 // Ownership:
 // - Every item created by Calendar is owned by it.
 
-#pragma once
+#ifndef CALENDAR_HPP_
+#define CALENDAR_HPP_
 
 #include "const.hpp"
-#include <QGraphicsObject>
+#include "event.hpp"
 #include <QGraphicsScene>
-#include <QPainter>
-#include <QString>
-#include <QTime>
-#include <compare>
 #include <set>
-#include <tuple>
-
-class Calendar;
-
-// @class Event
-// @brief Graphical representation of a single event in Calendar class.
-class Event : public QGraphicsObject {
-    Q_OBJECT
-    friend Calendar;
-
-public:
-    // @struct EventData
-    // @brief Structure allowing easy transfer of information about the event.
-    //
-    // Value type: comparable, copayable.
-    //
-    // Fields:
-    // - title: Title of event
-    // - week_day: 0=Monday ... 6=Sunday.
-    // - start: Time at which event started.
-    // - end: Time at which event ended.
-    //
-    // @note This struct is independent of graphics, used as a storage or comparison.
-    struct EventData {
-        QString title;
-        uint8_t week_day;
-        QTime start;
-        QTime end;
-        // @brief Helper function for comparator.
-        //
-        // Declares the order of comparison: start, end, title, week_day.
-        auto key() const {
-            return std::make_tuple(start.hour(), start.minute(), end.hour(), end.minute(), title.toStdString(),
-                                   week_day);
-        }
-        // @brief Declares ordering based on @ref key().
-        std::strong_ordering operator<=>(const EventData &other) const { return key() <=> other.key(); }
-    };
-    // @brief Constructor of a graphical event existing on the calendar
-    // @param event_data Information about the event.
-    // @param parent The owner of the event.
-    explicit Event(EventData &event_data, QGraphicsItem *parent = nullptr);
-    // @brief Defines ordering based on @ref EventData ordering.
-    std::strong_ordering operator<=>(const Event &other) const { return event_data_ <=> other.event_data_; };
-    // @brief Return the visiual rectangle of the event.
-    //
-    // @sa QGraphicsObject::boundingRect()
-    QRectF boundingRect() const override { return rectangle_; };
-    // @brief Defines the style of the rectangle and its text.
-    //
-    // This function is called by the Qt each time the Event needs a repaint.
-    //
-    // @param painter Use for drawing the style.
-    void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) override;
-    // @brief Getter of event_data_
-    EventData get_event_data() const { return event_data_; };
-
-private:
-    // @brief Set new rectangle and position of the Event.
-    // @param rectangle New visiual base of Event.
-    // @param position Pass to owner for a new location.
-    void set_rectangle(QRectF rectangle, QPointF position);
-    // Information about the event.
-    EventData event_data_;
-    // Base rectangle with Event visiuals.
-    QRectF rectangle_ = QRectF();
-    // Texts shown on the Event visiuals.
-    QGraphicsTextItem *title_text_ = nullptr;
-    QGraphicsTextItem *time_text_ = nullptr;
-};
 
 // @class Calendar
 // @brief QGraphicsScene showing week grid with event blocks.
@@ -117,6 +44,7 @@ public:
         return (time.hour() >= hour_start_) &&
                ((time.hour() < hour_end_) || (time.hour() == hour_end_ && time.minute() == 0));
     };
+    inline static constexpr uint8_t kWeekDaysSize = 7;
 
 private:
     uint8_t hour_start_;
@@ -206,3 +134,5 @@ protected:
     // @sa QGraphicsScene::mousePressEvent()
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
 };
+
+#endif
