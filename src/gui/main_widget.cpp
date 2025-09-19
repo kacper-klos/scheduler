@@ -1,16 +1,19 @@
 #include "calendar.hpp"
 #include <QApplication>
+#include <QGraphicsView>
 #include <QTableView>
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
-    Calendar calendar(6, 18);
-    QTableView calendar_view;
-
-    calendar_view.setModel(&calendar);
-    calendar_view.resize(600, 400);
-    calendar_view.show();
+    auto *view = new QGraphicsView;
+    auto *calendar = new Calendar;
+    view->setScene(calendar);
+    view->setRenderHint(QPainter::Antialiasing, true);
+    view->setFixedSize(calendar->sceneRect().size().toSize());
+    view->show();
+    view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    view->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     return app.exec();
 }

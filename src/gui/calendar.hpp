@@ -1,28 +1,138 @@
-#pragma once
+// @file calendar.hpp
+// @brief User interface for calendar and it events.
+//
+// Units:
+// - Pixels
+// Ownership:
+// - Every item created by Calendar is owned by it.
 
-#include <QAbstractTableModel>
-#include <QString>
-#include <QTime>
+#ifndef CALENDAR_HPP_
+#define CALENDAR_HPP_
 
-struct Event {
-    QString title;
-    QTime start;
-    QTime end;
-    int week_day;
-};
+#include "const.hpp"
+#include "event.hpp"
+#include <QGraphicsScene>
+#include <set>
 
-class Calendar : public QAbstractTableModel {
+// @class Calendar
+// @brief QGraphicsScene showing week grid with event blocks.
+//
+// @note All coordinates are set with respect to (0,0) point located at left-top corner.
+//       X increase in the right direction, while Y increase moving down.
+class Calendar : public QGraphicsScene {
     Q_OBJECT
 public:
-    explicit Calendar(uint8_t hour_start, uint8_t hour_end, QObject *parent = nullptr);
-
-    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
-    int columnCount(const QModelIndex &parent = QModelIndex()) const override;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
-    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    // @brief Constructor of a calendar scene.
+    // @param hour_start first hour shown (0-24).
+    // @param hour_end last hour shown (1-24).
+    // @param parent QObject owning the scene.
+    // @warning Both hour_start and hour_end must be (0-24) and hour_end must be strictly higher than hour_start.
+    explicit Calendar(uint8_t hour_start = 8, uint8_t hour_end = 18, QObject *parent = nullptr);
+    // @enum Location
+    // @brief Constants for location on the calendar grid.
+    enum class Location { kNone, kCells, kColumnHeader, kRowHeader };
+    // @brief Create new event visiual based on data.
+    //
+    // This function adds newly created event to @ref events_ then evoke @ref select_event_groups. Then calls @ref
+    // add_event_graphics on every event in order to refresh positions of every event, finally the event is add to
+    // screen.
+    //
+    // @param event_data information about new event.
+    void add_event(Event::EventData event_data);
+    // @brief Checks if QTime is present in the calendar.
+    bool time_in_calendar(QTime time) const {
+        return (time.hour() >= hour_start_) &&
+               ((time.hour() < hour_end_) || (time.hour() == hour_end_ && time.minute() == 0));
+    };
+    inline static constexpr uint8_t kWeekDaysSize = 7;
 
 private:
-    QVector<QVector<QString>> data_;
-    QVector<QString> header_column_;
-    QVector<QString> header_row_;
+    uint8_t hour_start_;
+    uint8_t hour_end_;
+    // Set of events present on the calendar.
+    std::multiset<Event *, DereferencedLess<Event>> events_[kWeekDaysSize];
+    // How many subcolumns each of day has.
+    uint16_t day_column_start_[kWeekDaysSize + 1];
+    // Text representing days of the week.
+    QGraphicsTextItem *column_header_[kWeekDaysSize];
+    // Text representing hours.
+    std::vector<QGraphicsTextItem *> row_header_;
+    // Layout values in px
+    double get_hour_height() const { return 60; };
+    double get_day_column_width() const { return 160; };
+    double get_column_header_height() const { return 30; };
+    double get_row_header_width() const { return 40; };
+    // @brief Translate time into y dimension in pixels.
+    // @param time Time which location will be returned.
+    // @warning time must be in between hour_start_ and hour_end_.
+    double get_time_y_dimension(QTime time) const;
+    // @brief Translates y dimension to height.
+    // @param position Location to translate.
+    // @warning position must be inside the calendar.
+    QTime get_y_time_value(double position) const;
+    // @brief Translate days into x dimension in pixels.
+    // @param day Day which location will be returned.
+    // @warning time must be in between 0 and kWeekDaysSize.
+    double get_day_column_x_dimension(double day_column) const;
+    // @brief Simple wrapper of @ref get_day_column_x_dimension() for full days.
+    double get_day_x_dimension(uint8_t day) const { return get_day_column_x_dimension(day_column_start_[day]); };
+    // @brief Translates x dimension to day.
+    // @param position Location to translate.
+    // @warning position must be inside the calendar.
+    uint8_t get_x_day_value(double position) const;
+    // @brief Get to what lacation is the point corresponding.
+    //
+    // Returns kNone if the point is outside the calendar or if point is in the top left corner which is neither a row
+    // nor column header.
+    //
+    // @param point The location of the point which will be identified.
+    Location identify_location(QPointF point) const;
+    // @brief Divides events inside a given day of the week in the most optimal groups.
+    //
+    // Use greedy algorithm to assign events in a way which minimalize the number of groups.
+    // It take information about the events from the @ref events_ at the respected weekday.
+    //
+    // @param week_day Day of the week from which events will be drawn.
+    std::vector<std::vector<Event *>> select_event_groups(uint8_t week_day);
+    // @brief Update the value of calendar in respect to change in one day width change.
+    //
+    // Perform changes only if the value of day_column_start_ needs adjustmen.
+    // Updates day_column_start_ and events corresponding to every day after the week_day.
+    // Update the @ref QRectF of the calendar scene to fit all day columns.
+    //
+    // @param week_day Day of which size is changed.
+    // @param new_size New size for the day.
+    // @warning week_day must be in [0, kWeekDaysSize].
+    void adjust_day_column_size(uint8_t week_day, uint16_t new_size);
+    // @brief Helper function for creating @ref QRectF() for an event.
+    //
+    // Based on the event_group and @ref groups_sizes defines the size of @ref QrectF() on which Event will be based and
+    // its place.
+    //
+    // @param event Event which visiuals will be set.
+    // @param event_group Number of group in which the event is placed.
+    void add_event_graphics(Event *event, uint8_t event_group);
+
+protected:
+    // @brief Draw grid, text for hours and days.
+    //
+    // Implementation of a function which must be defined by a proper QGraphicsScene.
+    // This function is called by Qt each time the background is refreshed.
+    //
+    // @param painter Pointer which will paint the rectangel.
+    // @param rectangle Rectangle representing the scene.
+    //
+    // @sa QGraphicsScene::drawBackground()
+    void drawBackground(QPainter *painter, const QRectF &rectangle) override;
+    // @brief Declares behavior after the mouse click.
+    //
+    // Implementation of a function from QGraphicsScene.
+    // Called by Qt each time the user presses on the calendar.
+    //
+    // @param event Information about the click.
+    //
+    // @sa QGraphicsScene::mousePressEvent()
+    void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
 };
+
+#endif
