@@ -14,27 +14,34 @@ CalendarPanel::CalendarPanel(QWidget *parent) : QWidget(parent) {
     // Connecting change of scene
     connect(calendar_selector_, &QComboBox::currentIndexChanged, this, &CalendarPanel::set_calendar_data);
     // Left panel
-    auto *button = new QPushButton;
-
+    auto *controls_widget = new QWidget(this);
+    auto *create_button = new QPushButton(kCreateButtonText, controls_widget);
+    connect(create_button, &QPushButton::clicked, this, [this] {
+        add_calendar_data(create_default_calendar());
+    }); // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
+    auto *delete_button = new QPushButton(kDeleteButtonText, controls_widget);
+    connect(delete_button, &QPushButton::clicked, this, &CalendarPanel::remove_calendar_data);
+    delete_button->setStyleSheet("background-color: red; color: white;");
+    // Layout of controls
     auto *controls_layout = new QVBoxLayout;
     controls_layout->addWidget(calendar_selector_);
-    controls_layout->addWidget(button);
+    controls_layout->addWidget(create_button);
+    controls_layout->addWidget(delete_button);
     controls_layout->addStretch();
-
-    auto *controls_widget = new QWidget(this);
+    // Set layout
     controls_widget->setLayout(controls_layout);
     // Calendar graphics add do combo
-    calendar_selector_->addItem( // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
-        kDefaultCalendarName,
-        QVariant::fromValue(new Calendar(8, 18, this))); // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
+    add_calendar_data(create_default_calendar()); // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
     // Combined layout
-    auto *full_layout = new QHBoxLayout(this);
+    auto *full_layout = new QHBoxLayout(this); // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
     full_layout->addWidget(controls_widget);
     full_layout->addWidget(calendar_view_, 1);
 }
 
-void CalendarPanel::add_calendar_data(CalendarPanel::SceneRecord data) {
-    calendar_selector_->addItem(data.title, QVariant::fromValue(data.calendar));
+void CalendarPanel::add_calendar_data(Calendar *calendar, QString title) {
+    calendar_selector_->addItem(title, QVariant::fromValue(calendar));
+    // Set to new calendar
+    calendar_selector_->setCurrentIndex(calendar_selector_->count() - 1);
 }
 
 void CalendarPanel::remove_calendar_data() {
