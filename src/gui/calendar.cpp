@@ -160,7 +160,7 @@ void Calendar::add_event_graphics(Event *event, uint8_t group) {
 }
 
 void Calendar::adjust_day_column_size(uint8_t week_day, uint16_t new_size) {
-    assert(week_day <= kWeekDaysSize && week_day > 0);
+    assert(week_day <= kWeekDaysSize && week_day >= 0);
     // Check if the change is even needed
     if (uint8_t difference = new_size + day_column_start_[week_day] - day_column_start_[week_day + 1];
         difference != 0) {
