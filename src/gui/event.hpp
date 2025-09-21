@@ -14,6 +14,9 @@ class Calendar;
 class Event : public QGraphicsObject {
     Q_OBJECT
     friend Calendar;
+signals:
+    // @brief Signal showing that the event is being edited.
+    void edit(Event *event);
 
 public:
     // @struct EventData
@@ -61,6 +64,8 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) override;
     // @brief Getter of event_data_
     EventData get_event_data() const { return event_data_; };
+    // @brief Getter for group
+    uint8_t get_group() const { return group_; };
 
 private:
     // @brief Set new rectangle and position of the Event.
@@ -69,11 +74,23 @@ private:
     void set_rectangle(QRectF rectangle, QPointF position);
     // Information about the event.
     EventData event_data_;
+    uint8_t group_;
     // Base rectangle with Event visiuals.
     QRectF rectangle_ = QRectF();
     // Texts shown on the Event visiuals.
     QGraphicsTextItem *title_text_ = nullptr;
     QGraphicsTextItem *time_text_ = nullptr;
+
+protected:
+    // @brief Declares behavior after the mouse click.
+    //
+    // Implementation of a function from QGraphicsScene.
+    // Called by Qt each time the user presses on the calendar.
+    //
+    // @param click Information about the click.
+    //
+    // @sa QGraphicsScene::mousePressEvent()
+    void mousePressEvent(QGraphicsSceneMouseEvent *click) override;
 };
 
 #endif

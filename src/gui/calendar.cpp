@@ -113,9 +113,14 @@ uint8_t Calendar::get_x_day_value(double position) const {
     assert(false);
 }
 
-void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *event) {
-    const QPointF position = event->scenePos();
-    if (this->identify_location(position) != Calendar::Location::kCells) {
+void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *click) {
+    const QPointF position = click->scenePos();
+    // Delegate to item
+    QGraphicsScene::mousePressEvent(click);
+    // Accept only left click in proper time which was not tackled by object.
+    if (this->identify_location(position) != Calendar::Location::kCells || click->button() != Qt::LeftButton ||
+        click->isAccepted()) {
+        click->ignore();
         return;
     }
     // identify day
@@ -125,30 +130,39 @@ void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *event) {
     // Show event creator
     EventCreator event_creator(day, time, QApplication::activeWindow());
     if (event_creator.exec() == QDialog::Accepted) {
-        this->add_event(event_creator.get_data());
+        Event::EventData data = event_creator.get_data();
+        this->add_event(data);
+        this->refresh_day_graphicly(data.week_day);
     }
+    click->accept();
 }
 
 void Calendar::add_event(Event::EventData event_data) {
     Event *new_event = new Event(event_data);
     events_[event_data.week_day].insert(new_event);
-    // Divides into subcolumns and show them
-    std::vector<std::vector<Event *>> event_groups = this->select_event_groups(event_data.week_day);
-    for (uint8_t i = 0; i < event_groups.size(); ++i) {
-        for (Event *event : event_groups[i]) {
-            this->add_event_graphics(event, i);
-        }
-    }
+    connect(new_event, &Event::edit, this, &Calendar::edit_event_action);
     this->addItem(new_event);
 }
 
-void Calendar::add_event_graphics(Event *event, uint8_t group) {
+void Calendar::refresh_day_graphicly(uint8_t week_day) {
+    std::vector<std::vector<Event *>> event_groups = this->select_event_groups(week_day);
+    // Adjust values for new size
+    adjust_day_column_size(week_day, event_groups.size());
+    for (uint8_t i = 0; i < event_groups.size(); ++i) {
+        for (Event *event : event_groups[i]) {
+            event->group_ = i;
+            this->add_event_graphics(event);
+        }
+    }
+}
+
+void Calendar::add_event_graphics(Event *event) {
     // Define constants used in this function
     constexpr double kEventPaddingX = 3;
     constexpr double kEventPaddingY = 3;
     Event::EventData data = event->get_event_data();
     // Define dimensions of event
-    double x = kEventPaddingX + this->get_day_column_x_dimension(day_column_start_[data.week_day] + group);
+    double x = kEventPaddingX + this->get_day_column_x_dimension(day_column_start_[data.week_day] + event->group_);
     double y = kEventPaddingY + get_time_y_dimension(data.start);
     double width = this->get_day_column_width() - 2 * kEventPaddingX;
     double height =
@@ -161,8 +175,12 @@ void Calendar::add_event_graphics(Event *event, uint8_t group) {
 
 void Calendar::adjust_day_column_size(uint8_t week_day, uint16_t new_size) {
     assert(week_day <= kWeekDaysSize && week_day >= 0);
+    // Protect day from having 0 width.
+    if (new_size == 0) {
+        new_size = 1;
+    }
     // Check if the change is even needed
-    if (uint8_t difference = new_size + day_column_start_[week_day] - day_column_start_[week_day + 1];
+    if (int16_t difference = new_size + day_column_start_[week_day] - day_column_start_[week_day + 1];
         difference != 0) {
         // Change position of day start and events in later days.
         for (uint8_t i = week_day + 1; i < kWeekDaysSize; ++i) {
@@ -183,7 +201,7 @@ void Calendar::adjust_day_column_size(uint8_t week_day, uint16_t new_size) {
     }
 }
 
-std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day) {
+std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day) const {
     std::vector<std::vector<Event *>> groups;
     // Assign all events
     for (auto *event : events_[week_day]) {
@@ -204,14 +222,36 @@ std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day
                 best_group = i;
             }
         }
-        // Create new group if new was not found
+        // Create new group if right was not found
         if (best_group == groups.size()) {
             groups.push_back({event});
         } else {
             groups[best_group].push_back(event);
         }
     }
-    // Adjust values for new size
-    adjust_day_column_size(week_day, groups.size());
     return groups;
+}
+
+void Calendar::edit_event_action(Event *event) {
+    EventCreator edit_event(event, QApplication::activeWindow());
+    if (edit_event.exec() == QDialog::Rejected) {
+        return;
+    }
+    uint8_t old_day = event->event_data_.week_day;
+    // Create new event when only edited
+    if (!edit_event.get_delete()) {
+        Event::EventData new_data = edit_event.get_data();
+        this->add_event(new_data);
+        // Adjust visiuals for new day
+        if (new_data.week_day != old_day) {
+            this->refresh_day_graphicly(new_data.week_day);
+        }
+    }
+    this->delete_event(event);
+    this->refresh_day_graphicly(old_day);
+}
+
+void Calendar::delete_event(Event *event) {
+    events_[event->event_data_.week_day].erase(event);
+    event->deleteLater();
 }

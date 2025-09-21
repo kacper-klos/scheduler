@@ -31,11 +31,9 @@ public:
     // @enum Location
     // @brief Constants for location on the calendar grid.
     enum class Location { kNone, kCells, kColumnHeader, kRowHeader };
-    // @brief Create new event visiual based on data.
+    // @brief Create new event based on data.
     //
-    // This function adds newly created event to @ref events_ then evoke @ref select_event_groups. Then calls @ref
-    // add_event_graphics on every event in order to refresh positions of every event, finally the event is add to
-    // screen.
+    // This function adds newly created event to @ref events_ and to the Calendar display.
     //
     // @param event_data information about new event.
     void add_event(Event::EventData event_data);
@@ -93,25 +91,38 @@ private:
     // It take information about the events from the @ref events_ at the respected weekday.
     //
     // @param week_day Day of the week from which events will be drawn.
-    std::vector<std::vector<Event *>> select_event_groups(uint8_t week_day);
-    // @brief Update the value of calendar in respect to change in one day width change.
+    std::vector<std::vector<Event *>> select_event_groups(uint8_t week_day) const;
+    // @brief Divides the day into groups.
     //
-    // Perform changes only if the value of day_column_start_ needs adjustmen.
-    // Updates day_column_start_ and events corresponding to every day after the week_day.
-    // Update the @ref QRectF of the calendar scene to fit all day columns.
+    // Select groups so no event in the group colide and the number of groups is minimal.
+    // Used by @ref refresh_day_graphicly to set proper visiuals.
     //
     // @param week_day Day of which size is changed.
-    // @param new_size New size for the day.
     // @warning week_day must be in [0, kWeekDaysSize].
     void adjust_day_column_size(uint8_t week_day, uint16_t new_size);
     // @brief Helper function for creating @ref QRectF() for an event.
     //
-    // Based on the event_group and @ref groups_sizes defines the size of @ref QrectF() on which Event will be based and
-    // its place.
+    // Based on the properties of @ref Event defines the size of @ref QrectF() on which Event will be based and
+    // place of the Event.
     //
-    // @param event Event which visiuals will be set.
-    // @param event_group Number of group in which the event is placed.
-    void add_event_graphics(Event *event, uint8_t event_group);
+    // @param event Event which visiuals bounds will be set.
+    void add_event_graphics(Event *event);
+    // @brief Set events in a day to they proper location.
+    //
+    // Add events to view and sets they size using @ref add_event_graphics.
+    // Updates day_column_start_ and events corresponding to every day after the week_day.
+    //
+    // @param week_day Day which will be refreshed.
+    void refresh_day_graphicly(uint8_t week_day);
+    // @brief Edit the event.
+    //
+    // Show widget for editing the event and take its input.
+    //
+    // @param event Event to edit.
+    void edit_event_action(Event *event);
+    // @brief Safely removes the event
+    // @param event Event to remove.
+    void delete_event(Event *event);
 
 protected:
     // @brief Draw grid, text for hours and days.
@@ -129,10 +140,10 @@ protected:
     // Implementation of a function from QGraphicsScene.
     // Called by Qt each time the user presses on the calendar.
     //
-    // @param event Information about the click.
+    // @param click Information about the click.
     //
     // @sa QGraphicsScene::mousePressEvent()
-    void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
+    void mousePressEvent(QGraphicsSceneMouseEvent *click) override;
 };
 
 #endif

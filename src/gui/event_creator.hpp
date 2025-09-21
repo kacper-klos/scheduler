@@ -7,6 +7,9 @@
 #include "event.hpp"
 #include <QComboBox>
 #include <QDialog>
+#include <QDialogButtonBox>
+#include <QFormLayout>
+#include <QLineEdit>
 #include <QTimeEdit>
 
 // @class EventCreator
@@ -20,27 +23,42 @@ public:
     // @param start_time Initial time shown in start_time_box_.
     // @param parent Object which takes ownership of the widget.
     explicit EventCreator(uint8_t week_day, QTime start_time, QWidget *parent = nullptr);
+    // @brief Constructor of widget used to edit an event.
+    // @param current_event Event which will be edited.
+    explicit EventCreator(Event *current_event, QWidget *parent = nullptr);
     // @brief Get data required to create new event.
     //
     // Constructs the data from all the QTimeEdit, QComboBox, QLineEdit.
-    Event::EventData get_data();
+    Event::EventData get_data() const;
+    // @brief Gettor of delete_.
+    bool get_delete() const { return delete_; };
 
 private:
+    // Was event deleted
+    bool delete_ = false;
     // Constants
-    inline static const QString kDialogTitle = "Event Creator";
+    inline static const QString kDialogTitleCreate = "Event Creator";
+    inline static const QString kDialogTitleEdit = "Event Edit";
     inline static const QString kDefaultEventTitle = "New Event";
     inline static const QString kTitleRow = "Title: ";
     inline static const QString kDayRowName = "Day: ";
     inline static const QString kStartTimeRowName = "Starting time: ";
     inline static const QString kEndTimeRowName = "End time: ";
+    inline static const QString kDeleteButtonText = "Delete";
     inline static const QStringList kWeekDays = {"Monday", "Tuesday",  "Wednesday", "Thursday",
                                                  "Friday", "Saturday", "Sunday"};
     inline static const QTime kDefaultTimeSpacing = QTime(1, 0);
+    // @brief Setup widget visuals.
+    //
+    // Add boxes to the widget, format them, and place them in the layout.
+    void input_boxes_setup();
     // Boxes of the widget which take the input.
-    QLineEdit *title_box_;
-    QComboBox *day_box_;
-    QTimeEdit *start_time_box_;
-    QTimeEdit *end_time_box_;
+    QLineEdit *title_box_ = new QLineEdit(this);
+    QComboBox *day_box_ = new QComboBox(this);
+    QTimeEdit *start_time_box_ = new QTimeEdit(this);
+    QTimeEdit *end_time_box_ = new QTimeEdit(this);
+    QDialogButtonBox *buttons_ = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    QFormLayout *layout_ = new QFormLayout(this);
 };
 
 #endif

@@ -1,4 +1,5 @@
 #include "event.hpp"
+#include <QGraphicsSceneMouseEvent>
 #include <QPainter>
 
 Event::Event(Event::EventData &event_data, QGraphicsItem *parent) : event_data_(event_data), QGraphicsObject(parent) {
@@ -41,4 +42,14 @@ void Event::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *
     time_text_->setPlainText(event_data_.start.toString("H:mm") + " - " + event_data_.end.toString("H:mm"));
     time_text_->setPos(kTextPaddingX, title_text_->boundingRect().height());
     time_text_->setTextWidth(width - 2 * kTextPaddingX);
+}
+
+void Event::mousePressEvent(QGraphicsSceneMouseEvent *click) {
+    // Accepts only right click.
+    if (click->button() != Qt::RightButton) {
+        click->ignore();
+        return;
+    }
+    emit edit(this);
+    click->accept();
 }
