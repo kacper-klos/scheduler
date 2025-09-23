@@ -3,10 +3,12 @@
 #include <QDialogButtonBox>
 #include <QPushButton>
 
-EventCreator::EventCreator(uint8_t week_day, QTime start_time, QWidget *parent) : QDialog(parent) {
+EventCreator::EventCreator(uint8_t week_day, QTime start_time, QTime lower_time_limit, QTime upper_time_limit,
+                           QWidget *parent)
+    : QDialog(parent) {
     QDialog::setWindowTitle(kDialogTitleCreate);
     // Use default setup
-    this->input_boxes_setup();
+    this->input_boxes_setup(lower_time_limit, upper_time_limit);
     // Day of the week selection.
     day_box_->setCurrentIndex(week_day);
     // Start time.
@@ -16,11 +18,12 @@ EventCreator::EventCreator(uint8_t week_day, QTime start_time, QWidget *parent) 
         start_time.addSecs(kDefaultTimeSpacing.hour() * 60 * 60 + kDefaultTimeSpacing.minute() * 60));
 }
 
-EventCreator::EventCreator(Event *event, QWidget *parent) : QDialog(parent) {
+EventCreator::EventCreator(Event *event, QTime lower_time_limit, QTime upper_time_limit, QWidget *parent)
+    : QDialog(parent) {
     QDialog::setWindowTitle(kDialogTitleCreate);
     Event::EventData event_data = event->get_event_data();
     // Use default setup
-    this->input_boxes_setup();
+    this->input_boxes_setup(lower_time_limit, upper_time_limit);
     // Title
     title_box_->setText(event_data.title);
     // Day of the week selection.
@@ -38,12 +41,18 @@ EventCreator::EventCreator(Event *event, QWidget *parent) : QDialog(parent) {
     layout_->addRow(delete_button);
 }
 
-void EventCreator::input_boxes_setup() {
+void EventCreator::input_boxes_setup(QTime lower_time_limit, QTime upper_time_limit) {
     // Format boxes
     title_box_->setPlaceholderText(kDefaultEventTitle);
     day_box_->addItems(kWeekDays.mid(0, kWeekDaysSize));
     start_time_box_->setDisplayFormat("HH:mm");
     end_time_box_->setDisplayFormat("HH:mm");
+    // Set time bounds.
+    start_time_box_->setMinimumTime(lower_time_limit);
+    end_time_box_->setMaximumTime(upper_time_limit);
+    // Always end time cannot go below-equal start.
+    connect(start_time_box_, &QTimeEdit::timeChanged, end_time_box_,
+            [this](QTime lower_limit) { end_time_box_->setMinimumTime(lower_limit.addSecs(60)); });
     // Accept button.
     connect(buttons_, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttons_, &QDialogButtonBox::rejected, this, &QDialog::reject);

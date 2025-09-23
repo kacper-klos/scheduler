@@ -22,10 +22,16 @@ public:
     // @param week_day Day of the week will be selected at the start.
     // @param start_time Initial time shown in start_time_box_.
     // @param parent Object which takes ownership of the widget.
-    explicit EventCreator(uint8_t week_day, QTime start_time, QWidget *parent = nullptr);
+    // @param lower_time_limit The lowest accepted event start time.
+    // @param lower_time_limit The highest accepted event end time.
+    explicit EventCreator(uint8_t week_day, QTime start_time, QTime lower_time_limit, QTime upper_time_limit,
+                          QWidget *parent = nullptr);
     // @brief Constructor of widget used to edit an event.
     // @param current_event Event which will be edited.
-    explicit EventCreator(Event *current_event, QWidget *parent = nullptr);
+    // @param lower_time_limit The lowest accepted event start time.
+    // @param lower_time_limit The highest accepted event end time.
+    explicit EventCreator(Event *current_event, QTime lower_time_limit, QTime upper_time_limit,
+                          QWidget *parent = nullptr);
     // @brief Get data required to create new event.
     //
     // Constructs the data from all the QTimeEdit, QComboBox, QLineEdit.
@@ -51,7 +57,10 @@ private:
     // @brief Setup widget visuals.
     //
     // Add boxes to the widget, format them, and place them in the layout.
-    void input_boxes_setup();
+    //
+    // @param lower_time_limit The lowest accepted event start time.
+    // @param lower_time_limit The highest accepted event end time.
+    void input_boxes_setup(QTime lower_time_limit, QTime upper_time_limit);
     // Boxes of the widget which take the input.
     QLineEdit *title_box_ = new QLineEdit(this);
     QComboBox *day_box_ = new QComboBox(this);

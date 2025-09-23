@@ -128,7 +128,7 @@ void Calendar::mousePressEvent(QGraphicsSceneMouseEvent *click) {
     // identify time
     QTime time = this->get_y_time_value(position.y());
     // Show event creator
-    EventCreator event_creator(day, time, QApplication::activeWindow());
+    EventCreator event_creator(day, time, QTime(hour_start_, 0), QTime(hour_end_, 0), QApplication::activeWindow());
     if (event_creator.exec() == QDialog::Accepted) {
         Event::EventData data = event_creator.get_data();
         this->add_event(data);
@@ -233,7 +233,7 @@ std::vector<std::vector<Event *>> Calendar::select_event_groups(uint8_t week_day
 }
 
 void Calendar::edit_event_action(Event *event) {
-    EventCreator edit_event(event, QApplication::activeWindow());
+    EventCreator edit_event(event, QTime(hour_start_, 0), QTime(hour_end_, 0), QApplication::activeWindow());
     if (edit_event.exec() == QDialog::Rejected) {
         return;
     }
